@@ -1,1 +1,1 @@
-﻿# Login_j3xdr
+# Login_j3xdr
