@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PartyRun Admin — Login_j3xdr</title>
+  <meta name="description" content="PartyRun rental admin — register customers, manage leases" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="bg-crumb" aria-hidden="true"></div>
+  <main class="app">
+    <header class="brand">
+      <div class="brand-mark" aria-hidden="true">PR</div>
+      <h1>PartyRun Admin</h1>
+      <p>ลงทะเบียนลูกค้าเช่าเครื่อง · ไม่มีสมัครเอง · Admin เท่านั้น</p>
+    </header>
+
+    <!-- Admin login -->
+    <section id="login-panel" class="panel">
+      <h2>เข้าสู่ระบบ Admin</h2>
+      <p class="hint">ต้องล็อกอินก่อนถึงจะเห็นฟอร์มลงทะเบียนลูกค้า</p>
+      <form id="login-form" autocomplete="on">
+        <div class="field">
+          <label for="login-email">อีเมล</label>
+          <input id="login-email" type="email" required placeholder="admin@email.com" autocomplete="username" />
+        </div>
+        <div class="field">
+          <label for="login-pass">รหัสผ่าน</label>
+          <input id="login-pass" type="password" required placeholder="••••••••" autocomplete="current-password" />
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit" id="login-btn">Sign in</button>
+        </div>
+        <div id="login-status" class="status muted" role="status"></div>
+      </form>
+    </section>
+
+    <!-- Admin dashboard (hidden until login) -->
+    <section id="dash" class="hidden">
+      <div class="topbar">
+        <div class="who">เข้าสู่ระบบแล้ว: <strong id="who-email"></strong></div>
+        <button type="button" class="btn btn-ghost" id="logout-btn">ออกจากระบบ</button>
+      </div>
+
+      <section class="panel">
+        <h2>ลงทะเบียนลูกค้า</h2>
+        <p class="hint">กำหนดระยะเวลาเช่า (ชม./นาที/วินาที) หรือติ๊กถาวร · ไม่มี self-register</p>
+        <form id="register-form">
+          <div class="grid-2">
+            <div class="field">
+              <label for="reg-email">อีเมลลูกค้า</label>
+              <input id="reg-email" type="email" required placeholder="customer@email.com" />
+            </div>
+            <div class="field">
+              <label for="reg-pass">รหัสผ่าน</label>
+              <input id="reg-pass" type="password" required minlength="6" placeholder="อย่างน้อย 6 ตัว" />
+            </div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="reg-h">ชั่วโมง</label>
+              <input id="reg-h" type="number" min="0" value="24" />
+            </div>
+            <div class="field">
+              <label for="reg-m">นาที</label>
+              <input id="reg-m" type="number" min="0" max="59" value="0" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="reg-s">วินาที</label>
+            <input id="reg-s" type="number" min="0" max="59" value="0" />
+          </div>
+          <label class="check-row">
+            <input id="reg-perm" type="checkbox" />
+            ถาวร (permanent) — ไม่หมดอายุ
+          </label>
+          <div class="actions">
+            <button class="btn btn-primary" type="submit" id="reg-btn">สร้างบัญชีลูกค้า</button>
+          </div>
+          <div id="reg-status" class="status muted" role="status"></div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="topbar" style="margin-bottom: 0.75rem">
+          <div>
+            <h2 style="margin:0">รายชื่อผู้ใช้</h2>
+            <p class="hint" style="margin:0.25rem 0 0">ขยายเวลา / ลบ / ดูวันหมดอายุ</p>
+          </div>
+          <button type="button" class="btn btn-ghost" id="refresh-btn">รีเฟรช</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>อีเมล</th>
+                <th>Role</th>
+                <th>หมดอายุ</th>
+                <th>Device</th>
+                <th>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="users-body">
+              <tr><td colspan="5" style="color:var(--muted)">กำลังโหลด…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="list-status" class="status muted" role="status"></div>
+      </section>
+    </section>
+
+    <footer class="note">
+      PartyRun rental · Supabase Auth · 1 เครื่อง / 1 ยูสเซอร์ · Login_j3xdr
+    </footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
