@@ -349,6 +349,36 @@ td .role.admin {
   font: inherit;
 }
 
+.inline-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.inline-row .field {
+  margin-bottom: 0;
+}
+
+.inline-row .grow {
+  flex: 1 1 12rem;
+}
+
+.inline-row .narrow {
+  flex: 0 0 7rem;
+}
+
+.lookup-box {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(18, 12, 10, 0.55);
+  font-size: 0.9rem;
+  min-height: 2.5rem;
+}
+
 footer.note {
   margin-top: 1.5rem;
   text-align: center;
