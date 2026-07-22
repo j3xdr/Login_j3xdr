@@ -11,13 +11,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260722-next1" />
+  <link rel="stylesheet" href="./styles.css?v=20260722-adminui1" />
 </head>
 <body>
   <div class="bakery-bg" aria-hidden="true">
     <div class="bakery-glow bakery-glow-a"></div>
     <div class="bakery-glow bakery-glow-b"></div>
     <div class="crumb-pattern"></div>
+    <div id="bg-floaters" class="bg-floaters"></div>
   </div>
 
   <header class="topbar">
@@ -29,11 +30,18 @@
       </span>
     </a>
     <div class="topbar-actions">
-      <div id="nav-admin" class="token-chip hidden" title="โหมดแอดมิน">
-        <img src="assets/level.png" alt="" width="22" height="22" />
-        <span>Admin</span>
+      <div id="api-status" class="api-chip is-waking" title="สถานะเซิร์ฟเวอร์" aria-live="polite">
+        API…
       </div>
-      <button type="button" id="logout-btn" class="btn btn-candy btn-logout hidden">ออกจากระบบ</button>
+      <div id="nav-admin" class="pill pill-devplay hidden" title="โหมดแอดมิน">Admin</div>
+      <button type="button" id="logout-btn" class="btn btn-candy btn-logout hidden" aria-label="ออกจากระบบ" title="ออกจากระบบ">
+        <svg class="logout-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M10 17l5-5-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M15 12H4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M15 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="logout-text">ออกจากระบบ</span>
+      </button>
     </div>
   </header>
 
@@ -92,25 +100,27 @@
     <section id="dash" class="view hidden">
       <div class="app-flow">
         <div class="status-strip panel">
-          <div class="status-strip-user">
-            <img class="who-avatar" src="assets/logo_4k.png" alt="" width="44" height="44" />
-            <div>
-              <p class="eyebrow">แอดมิน</p>
-              <p id="who-user" class="who-name">—</p>
-            </div>
-          </div>
-          <div class="status-strip-tokens">
-            <p class="eyebrow">
-              <img src="assets/coin.png" alt="" width="18" height="18" />
-              ระบบโทเค็น
+          <div class="home-card-copy">
+            <p class="eyebrow">แอดมิน</p>
+            <p id="who-user" class="who-name">—</p>
+            <p class="home-card-meta">
+              <span class="muted status-strip-note">สร้างผู้ใช้ · เติมโทเค็น</span>
             </p>
-            <p class="vault-num vault-num-sm">Admin</p>
-            <p class="muted">สร้างผู้ใช้ · เติมโทเค็น</p>
+          </div>
+          <div class="home-card-asset status-strip-asset" aria-hidden="true">
+            <img class="who-avatar" src="assets/logo_4k.png" alt="" width="52" height="52" />
+            <div class="status-strip-tokens">
+              <p class="eyebrow status-token-label">
+                <img src="assets/coin.png" alt="" width="14" height="14" />
+                ระบบโทเค็น
+              </p>
+              <p class="vault-num vault-num-sm">Admin</p>
+            </div>
           </div>
         </div>
 
-        <div class="tip-banner">
-          <img src="assets/tr_ga170.png" alt="" width="36" height="36" />
+        <div class="tip-banner tip-banner-compact">
+          <img src="assets/tr_ga170.png" alt="" width="28" height="28" />
           <p>หน้านี้สำหรับ <strong>แอดมินเท่านั้น</strong> — ผู้ใช้ทั่วไปเข้าผ่าน CKR WWDC</p>
         </div>
 
@@ -170,7 +180,7 @@
             <span class="panel-head">
               <img src="assets/notice_b19.png" alt="" width="32" height="32" />
               <span>
-                <span class="panel-title">Audit log</span>
+                <span class="panel-title">บันทึกการกระทำ</span>
                 <span class="panel-hint">การกระทำแอดมินล่าสุด</span>
               </span>
             </span>
@@ -200,7 +210,7 @@
             <form id="lookup-form" class="inline-row">
               <label class="field grow">
                 <span>ค้นหาชื่อผู้ใช้</span>
-                <input id="lookup-q" type="text" required placeholder="username" spellcheck="false" />
+                <input id="lookup-q" type="text" required placeholder="ชื่อผู้ใช้" spellcheck="false" />
               </label>
               <button class="btn btn-ghost" type="submit">ค้นหา</button>
             </form>
@@ -250,7 +260,7 @@
               <img src="assets/score.png" alt="" width="32" height="32" />
               <span>
                 <span class="panel-title">สร้างผู้ใช้</span>
-                <span class="panel-hint">Username + Password + โทเค็นเริ่มต้น</span>
+                <span class="panel-hint">ชื่อผู้ใช้ + รหัสผ่าน + โทเค็นเริ่มต้น</span>
               </span>
             </span>
             <span class="chevron" aria-hidden="true"></span>
@@ -291,8 +301,20 @@
     <p>CKR WWDC Admin · Login_j3xdr by j3da1</p>
   </footer>
 
+  <!-- Bakery modal -->
+  <div id="modal-root" class="modal-root hidden overlay-motion" aria-hidden="true">
+    <div class="modal-backdrop overlay-backdrop"></div>
+    <div class="modal-card overlay-sheet" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <button type="button" id="modal-close" class="modal-close" aria-label="ปิด">×</button>
+      <img id="modal-icon" class="modal-icon" src="assets/coin.png" alt="" width="56" height="56" />
+      <h2 id="modal-title" class="modal-title">—</h2>
+      <div id="modal-body" class="modal-body">—</div>
+      <div id="modal-actions" class="modal-actions"></div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./config.js?v=20260722-next1"></script>
-  <script src="./app.js?v=20260722-next1"></script>
+  <script src="./config.js?v=20260722-adminui1"></script>
+  <script src="./app.js?v=20260722-adminui1"></script>
 </body>
 </html>

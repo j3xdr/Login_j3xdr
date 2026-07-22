@@ -10,20 +10,36 @@
 
   const API = cfg.API_BASE || "";
   const SESSION_KEY = "ckr_admin_session_token";
+  const MOTION_CLOSE_MS = 320;
   const { createClient } = supabase;
   const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
   const $ = (id) => document.getElementById(id);
   const loginPanel = $("login-panel");
   const dash = $("dash");
+  const modalRoot = $("modal-root");
+  const modalTitle = $("modal-title");
+  const modalBody = $("modal-body");
+  const modalIcon = $("modal-icon");
+  const modalActions = $("modal-actions");
+  const modalCard = modalRoot?.querySelector(".modal-card") || null;
 
   let accessToken = null;
   let sessionToken = null;
   let adminId = null;
+  let apiReady = false;
+  let modalMode = null;
+  let modalResolver = null;
 
   function setStatus(el, text, kind) {
+    if (!el) return;
     el.textContent = text || "";
     el.className = "status " + (kind || "muted");
+    if (text) {
+      el.classList.remove("is-fresh");
+      void el.offsetWidth;
+      el.classList.add("is-fresh");
+    }
   }
 
   function escapeHtml(s) {
@@ -33,6 +49,376 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   }
+
+  function prefersReducedMotion() {
+    try {
+      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /* ---------- Adaptive floating bg (assets_web/bg) ---------- */
+  const BG_FLOAT_BASE = "assets_web/bg/";
+  const BG_FLOAT_COUNT = 70;
+  const BG_EDGE_ZONES = [
+    { top: [4, 22], left: [2, 18] },
+    { top: [4, 22], left: [78, 94] },
+    { top: [28, 48], left: [1, 12] },
+    { top: [28, 48], left: [86, 96] },
+    { top: [52, 72], left: [2, 16] },
+    { top: [52, 72], left: [82, 95] },
+    { top: [74, 90], left: [8, 28] },
+    { top: [74, 90], left: [70, 90] },
+    { top: [8, 18], left: [36, 62] },
+  ];
+
+  function bgFloatCountForWidth(w) {
+    if (w < 480) return 3;
+    if (w < 768) return 5;
+    if (w < 1100) return 7;
+    return 9;
+  }
+
+  function bgFloatSizeRange(w) {
+    if (w < 480) return [36, 52];
+    if (w < 768) return [40, 60];
+    return [44, 72];
+  }
+
+  function shuffleInPlace(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = arr[i];
+      arr[i] = arr[j];
+      arr[j] = t;
+    }
+    return arr;
+  }
+
+  function randBetween(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  function initBgFloaters() {
+    const root = $("bg-floaters");
+    if (!root) return;
+
+    let lastCount = -1;
+    let resizeTimer = 0;
+
+    function rebuild() {
+      const w = window.innerWidth || document.documentElement.clientWidth || 1024;
+      const count = bgFloatCountForWidth(w);
+      if (count === lastCount && root.childElementCount === count) return;
+      lastCount = count;
+
+      const indices = Array.from({ length: BG_FLOAT_COUNT }, (_, i) => i + 1);
+      shuffleInPlace(indices);
+      const picked = indices.slice(0, count);
+      const zones = BG_EDGE_ZONES.slice();
+      shuffleInPlace(zones);
+      const [minW, maxW] = bgFloatSizeRange(w);
+
+      root.replaceChildren();
+      for (let i = 0; i < picked.length; i++) {
+        const n = String(picked[i]).padStart(2, "0");
+        const zone = zones[i % zones.length];
+        const img = document.createElement("img");
+        img.className = "float-deco";
+        img.alt = "";
+        img.decoding = "async";
+        img.draggable = false;
+        img.src = `${BG_FLOAT_BASE}upgrade02_${n}_shop.png`;
+        const width = Math.round(randBetween(minW, maxW));
+        const top = randBetween(zone.top[0], zone.top[1]);
+        const left = randBetween(zone.left[0], zone.left[1]);
+        const duration = randBetween(9, 16);
+        const delay = -randBetween(0, 12);
+        img.style.width = `${width}px`;
+        img.style.top = `${top}%`;
+        img.style.left = `${left}%`;
+        img.style.animationDuration = `${duration.toFixed(1)}s`;
+        img.style.animationDelay = `${delay.toFixed(1)}s`;
+        root.appendChild(img);
+      }
+    }
+
+    rebuild();
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(rebuild, 180);
+    });
+  }
+
+  function animateOpen(root) {
+    if (!root) return;
+    root.classList.remove("hidden", "is-closing");
+    root.setAttribute("aria-hidden", "false");
+    void root.offsetWidth;
+    requestAnimationFrame(() => {
+      root.classList.add("is-open");
+    });
+  }
+
+  function animateClose(root, onDone, opts = {}) {
+    const instant = !!opts.instant || prefersReducedMotion();
+    if (!root) {
+      if (typeof onDone === "function") onDone();
+      return;
+    }
+    const finish = () => {
+      root.classList.add("hidden");
+      root.classList.remove("is-open", "is-closing");
+      root.setAttribute("aria-hidden", "true");
+      if (typeof onDone === "function") onDone();
+    };
+    if (instant || root.classList.contains("hidden")) {
+      finish();
+      return;
+    }
+    root.classList.add("is-closing");
+    setTimeout(finish, MOTION_CLOSE_MS);
+  }
+
+  /* ---------- API health chip ---------- */
+  function paintApiStatus(state, text) {
+    const el = $("api-status");
+    if (!el) return;
+    el.className = "api-chip is-" + (state || "waking");
+    el.textContent = text || "";
+  }
+
+  async function pingApiHealth(retries) {
+    const tries = Math.max(1, Number(retries) || 1);
+    paintApiStatus("waking", "กำลังปลุกเซิร์ฟเวอร์…");
+    for (let i = 0; i < tries; i++) {
+      const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timer = setTimeout(() => {
+        try {
+          ctrl?.abort();
+        } catch (_) {}
+      }, 4500);
+      try {
+        const res = await fetch(API + "/api/health", {
+          method: "GET",
+          signal: ctrl?.signal,
+        });
+        clearTimeout(timer);
+        if (res.ok) {
+          apiReady = true;
+          paintApiStatus("ready", "API พร้อม");
+          return true;
+        }
+      } catch (_) {
+        clearTimeout(timer);
+      }
+      if (i < tries - 1) {
+        paintApiStatus("waking", "กำลังปลุกเซิร์ฟเวอร์…");
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+    }
+    apiReady = false;
+    paintApiStatus("down", "API ยังไม่พร้อม");
+    return false;
+  }
+
+  /* ---------- Modal system ---------- */
+  function clearModalActions() {
+    if (!modalActions) return;
+    modalActions.innerHTML = "";
+    modalActions.className = "modal-actions";
+  }
+
+  function makeBtn(label, className, onClick) {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "btn " + className;
+    el.addEventListener("click", onClick);
+    el.appendChild(document.createTextNode(label));
+    return el;
+  }
+
+  function settleModal(value) {
+    const resolve = modalResolver;
+    modalResolver = null;
+    if (typeof resolve === "function") resolve(value);
+  }
+
+  function openModal({ mode, title, body, icon, locked, bodyHtml }) {
+    if (!modalRoot) return;
+    modalMode = mode;
+    if (modalTitle) modalTitle.textContent = title;
+    if (modalBody) {
+      if (bodyHtml) modalBody.innerHTML = bodyHtml;
+      else modalBody.textContent = body || "";
+    }
+    if (modalIcon) modalIcon.src = icon || "assets/coin.png";
+    modalRoot.classList.toggle("locked", !!locked);
+    const closeBtn = $("modal-close");
+    if (closeBtn) {
+      closeBtn.classList.toggle("is-hidden", !!locked);
+      closeBtn.disabled = !!locked;
+    }
+    if (modalCard) {
+      modalCard.classList.remove("is-shake");
+      void modalCard.offsetWidth;
+      if (mode === "error") modalCard.classList.add("is-shake");
+    }
+    animateOpen(modalRoot);
+  }
+
+  function forceCloseModal() {
+    modalMode = null;
+    clearModalActions();
+    animateClose(
+      modalRoot,
+      () => {
+        if (modalRoot) modalRoot.classList.remove("locked");
+        if (modalCard) modalCard.classList.remove("is-shake");
+      },
+      { instant: true }
+    );
+  }
+
+  function closeModalAndSettle(value) {
+    modalMode = null;
+    clearModalActions();
+    animateClose(modalRoot, () => {
+      if (modalRoot) modalRoot.classList.remove("locked");
+      if (modalCard) modalCard.classList.remove("is-shake");
+      settleModal(value);
+    });
+  }
+
+  function showConfirmModal({
+    title,
+    body,
+    confirmLabel,
+    cancelLabel,
+    danger,
+    icon,
+  } = {}) {
+    return new Promise((resolve) => {
+      modalResolver = resolve;
+      clearModalActions();
+      openModal({
+        mode: "confirm",
+        title: title || "ยืนยัน?",
+        body: body || "",
+        icon: icon || "assets/notice_b19.png",
+        locked: false,
+      });
+      if (modalActions) {
+        modalActions.classList.add("row");
+        modalActions.appendChild(
+          makeBtn(cancelLabel || "ยกเลิก", "btn-ghost", () => {
+            closeModalAndSettle(false);
+          })
+        );
+        modalActions.appendChild(
+          makeBtn(
+            confirmLabel || "ยืนยัน",
+            danger ? "btn-danger" : "btn-candy",
+            () => {
+              closeModalAndSettle(true);
+            }
+          )
+        );
+      }
+    });
+  }
+
+  function showPromptModal({
+    title,
+    body,
+    placeholder,
+    defaultValue,
+    confirmLabel,
+    cancelLabel,
+    icon,
+  } = {}) {
+    return new Promise((resolve) => {
+      modalResolver = resolve;
+      clearModalActions();
+      const inputId = "modal-prompt-input";
+      openModal({
+        mode: "prompt",
+        title: title || "กรอกข้อมูล",
+        bodyHtml:
+          "<p>" +
+          escapeHtml(body || "") +
+          '</p><input id="' +
+          inputId +
+          '" class="modal-prompt-input" type="text" placeholder="' +
+          escapeHtml(placeholder || "") +
+          '" value="' +
+          escapeHtml(defaultValue || "") +
+          '" />',
+        icon: icon || "assets/notice_b19.png",
+        locked: false,
+      });
+      const input = $(inputId);
+      if (input) {
+        requestAnimationFrame(() => {
+          input.focus();
+          input.select();
+        });
+        input.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter") {
+            ev.preventDefault();
+            closeModalAndSettle(input.value);
+          }
+        });
+      }
+      if (modalActions) {
+        modalActions.classList.add("row");
+        modalActions.appendChild(
+          makeBtn(cancelLabel || "ยกเลิก", "btn-ghost", () => {
+            closeModalAndSettle(null);
+          })
+        );
+        modalActions.appendChild(
+          makeBtn(confirmLabel || "ตกลง", "btn-candy", () => {
+            closeModalAndSettle(input ? input.value : "");
+          })
+        );
+      }
+    });
+  }
+
+  function showAlertModal({ title, body, confirmLabel, icon, mode } = {}) {
+    return new Promise((resolve) => {
+      modalResolver = resolve;
+      clearModalActions();
+      openModal({
+        mode: mode || "alert",
+        title: title || "แจ้งเตือน",
+        body: body || "",
+        icon: icon || "assets/notice_b19.png",
+        locked: false,
+      });
+      if (modalActions) {
+        modalActions.appendChild(
+          makeBtn(confirmLabel || "ตกลง", "btn-candy", () => {
+            closeModalAndSettle(undefined);
+          })
+        );
+      }
+    });
+  }
+
+  $("modal-close")?.addEventListener("click", () => {
+    if (modalMode === "confirm") closeModalAndSettle(false);
+    else if (modalMode === "prompt") closeModalAndSettle(null);
+    else closeModalAndSettle(undefined);
+  });
+
+  modalRoot?.querySelector(".modal-backdrop")?.addEventListener("click", () => {
+    if (modalMode === "confirm") closeModalAndSettle(false);
+    else if (modalMode === "prompt") closeModalAndSettle(null);
+    else if (modalMode === "alert" || modalMode === "error") closeModalAndSettle(undefined);
+  });
 
   function loadStoredSessionToken() {
     try {
@@ -181,12 +567,12 @@
             '<div class="admin-row-head">' +
             "<strong>" +
             tokens +
-            " Token · " +
+            " โทเค็น · " +
             escapeHtml(baht) +
             "฿</strong>" +
             '<button type="button" class="btn btn-candy" data-action="credit-retry">เครดิตซ้ำ</button>' +
             "</div>" +
-            '<div class="muted">user: ' +
+            '<div class="muted">ผู้ใช้: ' +
             escapeHtml(row.user_id) +
             " · " +
             escapeHtml(formatDay(row.created_at)) +
@@ -212,7 +598,7 @@
       const data = await api("/api/admin/audit?limit=40");
       const items = data.items || [];
       if (!items.length) {
-        root.textContent = "ยังไม่มี log";
+        root.textContent = "ยังไม่มีบันทึก";
         return;
       }
       root.className = "admin-list";
@@ -226,9 +612,9 @@
             "</strong><span class=\"muted\">" +
             escapeHtml(formatDay(row.created_at)) +
             "</span></div>" +
-            '<div class="muted">actor: ' +
+            '<div class="muted">ผู้ทำ: ' +
             escapeHtml(row.actor_id || "—") +
-            " · target: " +
+            " · เป้าหมาย: " +
             escapeHtml(row.target_user_id || "—") +
             "</div>" +
             (meta
@@ -263,14 +649,14 @@
         " · ล้ม " +
         escapeHtml(runs.failed || 0) +
         ")<br>" +
-        "โทเค็น credit: +" +
+        "โทเค็นเติม: +" +
         escapeHtml(data.tokens_credited || 0) +
-        " · consume: -" +
+        " · ใช้ไป: -" +
         escapeHtml(data.tokens_consumed || 0) +
         "<br>" +
         "เติมเงิน: " +
         escapeHtml(data.topups || 0) +
-        " · needs_manual: " +
+        " · ต้องตามมือ: " +
         escapeHtml(data.topups_needs_manual || 0);
     } catch (e) {
       root.textContent = e.message || String(e);
@@ -416,9 +802,15 @@
     const userId = item.getAttribute("data-user-id");
     const name = item.querySelector(".user-name")?.textContent || userId;
     const listStatus = $("list-status");
-    if (!window.confirm('ลบผู้ใช้ "' + name + '" ถาวร?\nบัญชี Auth + โปรไฟล์จะถูกลบ')) {
-      return;
-    }
+    const confirmed = await showConfirmModal({
+      title: "ลบผู้ใช้?",
+      body: 'ลบผู้ใช้ "' + name + '" ถาวร?\nบัญชี Auth + โปรไฟล์จะถูกลบ',
+      confirmLabel: "ลบถาวร",
+      cancelLabel: "ยกเลิก",
+      danger: true,
+      icon: "assets/notice_b19.png",
+    });
+    if (!confirmed) return;
     setStatus(listStatus, "กำลังลบ…", "muted");
     try {
       await api("/api/admin/users/" + encodeURIComponent(userId), {
@@ -435,7 +827,14 @@
     const userId = item.getAttribute("data-user-id");
     const name = item.querySelector(".user-name")?.textContent || userId;
     const listStatus = $("list-status");
-    const reasonRaw = window.prompt('เหตุผลแบน "' + name + '" (ว่างได้)', "");
+    const reasonRaw = await showPromptModal({
+      title: "แบนผู้ใช้",
+      body: 'เหตุผลแบน "' + name + '" (ว่างได้)',
+      placeholder: "เหตุผล (ไม่บังคับ)",
+      defaultValue: "",
+      confirmLabel: "แบน",
+      cancelLabel: "ยกเลิก",
+    });
     if (reasonRaw === null) return;
     const reason = String(reasonRaw).trim();
     setStatus(listStatus, "กำลังแบน…", "muted");
@@ -487,6 +886,7 @@
     $("login-btn").disabled = true;
     setStatus($("login-status"), "กำลังเข้าสู่ระบบ…", "muted");
     try {
+      await ensureApiReady();
       const data = await api("/api/auth/login", {
         method: "POST",
         body: { username, password },
@@ -513,6 +913,11 @@
       $("login-btn").disabled = false;
     }
   });
+
+  async function ensureApiReady() {
+    if (apiReady) return true;
+    return pingApiHealth(2);
+  }
 
   $("logout-btn").addEventListener("click", async () => {
     await sb.auth.signOut();
@@ -565,6 +970,14 @@
     const row = btn.closest("[data-redemption-id]");
     const id = row?.getAttribute("data-redemption-id");
     if (!id) return;
+    const confirmed = await showConfirmModal({
+      title: "เครดิตซ้ำ?",
+      body: "ยืนยันเครดิตโทเค็นสำหรับรายการค้างนี้",
+      confirmLabel: "เครดิตซ้ำ",
+      cancelLabel: "ยกเลิก",
+      icon: "assets/coin.png",
+    });
+    if (!confirmed) return;
     btn.disabled = true;
     try {
       await api("/api/admin/topups/" + encodeURIComponent(id) + "/credit", {
@@ -573,7 +986,11 @@
       });
       await Promise.all([loadStuckTopups(), loadUsers(), loadAudit()]);
     } catch (err) {
-      window.alert(err.message || String(err));
+      await showAlertModal({
+        title: "เครดิตไม่สำเร็จ",
+        body: err.message || String(err),
+        mode: "error",
+      });
     } finally {
       btn.disabled = false;
     }
@@ -594,7 +1011,7 @@
       });
       setStatus(
         $("create-status"),
-        "สร้างแล้ว: " + data.username + " · " + data.token_balance + " tokens",
+        "สร้างแล้ว: " + data.username + " · " + data.token_balance + " โทเค็น",
         "ok"
       );
       $("create-form").reset();
@@ -610,11 +1027,11 @@
   $("lookup-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const q = $("lookup-q").value.trim();
-    $("lookup-result").textContent = "Looking up…";
+    $("lookup-result").textContent = "กำลังค้นหา…";
     try {
       const data = await api("/api/admin/lookup?q=" + encodeURIComponent(q));
       if (!data.ok) {
-        $("lookup-result").textContent = data.reason || "not found";
+        $("lookup-result").textContent = data.reason || "ไม่พบผู้ใช้";
         return;
       }
       let topupHtml = "";
@@ -636,7 +1053,7 @@
                     escapeHtml(formatDay(row.created_at)) +
                     " · " +
                     escapeHtml(row.tokens_credited || row.package_tokens) +
-                    "T · " +
+                    "โทเค็น · " +
                     escapeHtml(row.amount_baht) +
                     "฿ · " +
                     st +
@@ -651,9 +1068,9 @@
       $("lookup-result").innerHTML =
         "<strong>" +
         escapeHtml(data.username || q) +
-        "</strong> · tokens: " +
+        "</strong> · โทเค็น: " +
         escapeHtml(data.token_balance) +
-        " · role: " +
+        " · บทบาท: " +
         escapeHtml(data.role) +
         topupHtml;
       $("credit-q").value = data.username || q;
@@ -664,7 +1081,7 @@
 
   $("credit-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    setStatus($("credit-status"), "Crediting…", "muted");
+    setStatus($("credit-status"), "กำลังเติมโทเค็น…", "muted");
     try {
       const data = await api("/api/admin/add-tokens", {
         method: "POST",
@@ -674,15 +1091,17 @@
           reason: "admin_credit",
         },
       });
-      setStatus($("credit-status"), "New balance: " + data.token_balance, "ok");
+      setStatus($("credit-status"), "ยอดใหม่: " + data.token_balance, "ok");
       await Promise.all([loadUsers(), loadAudit()]);
     } catch (err) {
       setStatus($("credit-status"), err.message, "err");
     }
   });
 
+  initBgFloaters();
   initAccordions();
   sessionToken = loadStoredSessionToken();
+  pingApiHealth(2).catch(() => {});
 
   (async () => {
     const ctx = await requireAdminSession();
