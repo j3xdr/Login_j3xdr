@@ -243,6 +243,48 @@
     }
   }
 
+  async function loadStats() {
+    const root = $("daily-stats");
+    if (!root) return;
+    root.textContent = "กำลังโหลด…";
+    root.className = "stats-box muted";
+    try {
+      const data = await api("/api/admin/stats");
+      const runs = data.runs || {};
+      root.className = "stats-box";
+      root.innerHTML =
+        "<strong>วันที่ " +
+        escapeHtml(data.date) +
+        "</strong><br>" +
+        "ฟาร์มทั้งหมด: " +
+        escapeHtml(data.runs_total || 0) +
+        " (สำเร็จ " +
+        escapeHtml(runs.succeeded || 0) +
+        " · ล้ม " +
+        escapeHtml(runs.failed || 0) +
+        ")<br>" +
+        "โทเค็น credit: +" +
+        escapeHtml(data.tokens_credited || 0) +
+        " · consume: -" +
+        escapeHtml(data.tokens_consumed || 0) +
+        "<br>" +
+        "เติมเงิน: " +
+        escapeHtml(data.topups || 0) +
+        " · needs_manual: " +
+        escapeHtml(data.topups_needs_manual || 0);
+    } catch (e) {
+      root.textContent = e.message || String(e);
+    }
+  }
+
+  async function loadSettings() {
+    try {
+      const data = await api("/api/admin/settings");
+      if ($("set-farm-maint")) $("set-farm-maint").checked = !!data.farm_maintenance;
+      if ($("set-topup-maint")) $("set-topup-maint").checked = !!data.topup_maintenance;
+    } catch (_) {}
+  }
+
   async function showDash(profile) {
     loginPanel.classList.add("hidden");
     dash.classList.remove("hidden");
@@ -250,7 +292,13 @@
     adminId = profile.id || null;
     $("who-user").textContent = profile.username || profile.display_name || "admin";
     initAccordions();
-    await Promise.all([loadUsers(), loadStuckTopups(), loadAudit()]);
+    await Promise.all([
+      loadUsers(),
+      loadStuckTopups(),
+      loadAudit(),
+      loadStats(),
+      loadSettings(),
+    ]);
   }
 
   function showLogin() {
@@ -274,7 +322,9 @@
         const bal = Number(u.token_balance ?? 0);
         const isSelf = adminId && u.id === adminId;
         const isAdmin = role === "admin";
+        const banned = !!u.banned_at;
         const canDelete = !isSelf && !isAdmin;
+        const canBan = !isSelf && !isAdmin;
         return (
           '<article class="user-item" data-user-id="' +
           id +
@@ -290,6 +340,7 @@
           '">' +
           role +
           "</span>" +
+          (banned ? '<span class="banned-tag">ถูกแบน</span>' : "") +
           "</div>" +
           '<div class="user-item-ctrl">' +
           '<div class="token-group">' +
@@ -303,6 +354,11 @@
           '" />' +
           '<button type="button" class="btn btn-ghost btn-sm" data-action="save-tokens">บันทึก</button>' +
           "</div>" +
+          (canBan
+            ? banned
+              ? '<button type="button" class="btn btn-ghost btn-sm" data-action="unban-user">ปลดแบน</button>'
+              : '<button type="button" class="btn btn-ghost btn-sm" data-action="ban-user">แบน</button>'
+            : "") +
           (canDelete
             ? '<button type="button" class="btn btn-danger btn-sm" data-action="delete-user">ลบ</button>'
             : '<span class="muted tiny">' + (isSelf ? "คุณ" : "") + "</span>") +
@@ -375,6 +431,43 @@
     }
   }
 
+  async function banUser(item) {
+    const userId = item.getAttribute("data-user-id");
+    const name = item.querySelector(".user-name")?.textContent || userId;
+    const listStatus = $("list-status");
+    const reasonRaw = window.prompt('เหตุผลแบน "' + name + '" (ว่างได้)', "");
+    if (reasonRaw === null) return;
+    const reason = String(reasonRaw).trim();
+    setStatus(listStatus, "กำลังแบน…", "muted");
+    try {
+      await api("/api/admin/users/" + encodeURIComponent(userId) + "/ban", {
+        method: "POST",
+        body: { reason },
+      });
+      setStatus(listStatus, "แบนแล้ว: " + name, "ok");
+      await Promise.all([loadUsers(), loadAudit()]);
+    } catch (err) {
+      setStatus(listStatus, err.message || String(err), "err");
+    }
+  }
+
+  async function unbanUser(item) {
+    const userId = item.getAttribute("data-user-id");
+    const name = item.querySelector(".user-name")?.textContent || userId;
+    const listStatus = $("list-status");
+    setStatus(listStatus, "กำลังปลดแบน…", "muted");
+    try {
+      await api("/api/admin/users/" + encodeURIComponent(userId) + "/unban", {
+        method: "POST",
+        body: {},
+      });
+      setStatus(listStatus, "ปลดแบนแล้ว: " + name, "ok");
+      await Promise.all([loadUsers(), loadAudit()]);
+    } catch (err) {
+      setStatus(listStatus, err.message || String(err), "err");
+    }
+  }
+
   $("users-body").addEventListener("click", (e) => {
     const btn = e.target.closest("[data-action]");
     if (!btn) return;
@@ -383,6 +476,8 @@
     const action = btn.getAttribute("data-action");
     if (action === "save-tokens") saveTokens(item);
     if (action === "delete-user") deleteUser(item);
+    if (action === "ban-user") banUser(item);
+    if (action === "unban-user") unbanUser(item);
   });
 
   $("login-form").addEventListener("submit", async (e) => {
@@ -440,6 +535,28 @@
   $("refresh-audit-btn")?.addEventListener("click", (e) => {
     e.stopPropagation();
     loadAudit();
+  });
+
+  $("refresh-stats-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    loadStats();
+  });
+
+  $("save-settings-btn")?.addEventListener("click", async () => {
+    setStatus($("settings-status"), "กำลังบันทึก…", "muted");
+    try {
+      await api("/api/admin/settings", {
+        method: "POST",
+        body: {
+          farm_maintenance: !!$("set-farm-maint")?.checked,
+          topup_maintenance: !!$("set-topup-maint")?.checked,
+        },
+      });
+      setStatus($("settings-status"), "บันทึกสถานะแล้ว", "ok");
+      await Promise.all([loadSettings(), loadAudit()]);
+    } catch (err) {
+      setStatus($("settings-status"), err.message || String(err), "err");
+    }
   });
 
   $("stuck-topups")?.addEventListener("click", async (e) => {

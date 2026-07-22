@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260722-secux" />
+  <link rel="stylesheet" href="./styles.css?v=20260722-next1" />
 </head>
 <body>
   <div class="bakery-bg" aria-hidden="true">
@@ -112,6 +112,37 @@
         <div class="tip-banner">
           <img src="assets/tr_ga170.png" alt="" width="36" height="36" />
           <p>หน้านี้สำหรับ <strong>แอดมินเท่านั้น</strong> — ผู้ใช้ทั่วไปเข้าผ่าน CKR WWDC</p>
+        </div>
+
+        <div class="panel accordion is-open" data-accordion>
+          <button type="button" class="accordion-toggle" aria-expanded="true">
+            <span class="panel-head">
+              <img src="assets/score.png" alt="" width="32" height="32" />
+              <span>
+                <span class="panel-title">สรุปรายวัน / ปิดปรับปรุง</span>
+                <span class="panel-hint">สถิติวันนี้ (Asia/Bangkok) และสวิตช์ maintenance</span>
+              </span>
+            </span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div class="accordion-body">
+            <div class="admin-toolbar">
+              <button type="button" class="btn btn-ghost" id="refresh-stats-btn">รีเฟรชสถิติ</button>
+            </div>
+            <div id="daily-stats" class="stats-box muted">กำลังโหลด…</div>
+            <div class="settings-row">
+              <label class="toggle-field">
+                <input type="checkbox" id="set-farm-maint" />
+                <span>ปิดฟาร์ม (maintenance)</span>
+              </label>
+              <label class="toggle-field">
+                <input type="checkbox" id="set-topup-maint" />
+                <span>ปิดเติมเงิน (maintenance)</span>
+              </label>
+              <button type="button" class="btn btn-candy" id="save-settings-btn">บันทึกสถานะ</button>
+            </div>
+            <p id="settings-status" class="status muted" role="status"></p>
+          </div>
         </div>
 
         <!-- 0. เติมค้าง / audit -->
@@ -261,7 +292,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./config.js?v=20260722-secux"></script>
-  <script src="./app.js?v=20260722-secux"></script>
+  <script src="./config.js?v=20260722-next1"></script>
+  <script src="./app.js?v=20260722-next1"></script>
 </body>
 </html>
