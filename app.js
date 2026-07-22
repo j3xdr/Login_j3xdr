@@ -9,6 +9,7 @@
   }
 
   const API = cfg.API_BASE || "";
+  const SESSION_KEY = "ckr_admin_session_token";
   const { createClient } = supabase;
   const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
@@ -17,6 +18,7 @@
   const dash = $("dash");
 
   let accessToken = null;
+  let sessionToken = null;
   let adminId = null;
 
   function setStatus(el, text, kind) {
@@ -32,12 +34,54 @@
       .replace(/"/g, "&quot;");
   }
 
+  function loadStoredSessionToken() {
+    try {
+      return localStorage.getItem(SESSION_KEY) || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function persistSessionToken(token) {
+    sessionToken = token || null;
+    try {
+      if (!sessionToken) localStorage.removeItem(SESSION_KEY);
+      else localStorage.setItem(SESSION_KEY, sessionToken);
+    } catch (_) {}
+  }
+
+  function formatDay(iso) {
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return "—";
+      return d.toLocaleString("th-TH", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (_) {
+      return "—";
+    }
+  }
+
+  async function handleSessionReplaced() {
+    try {
+      await sb.auth.signOut();
+    } catch (_) {}
+    accessToken = null;
+    persistSessionToken(null);
+    showLogin();
+    setStatus($("login-status"), "มีการเข้าสู่ระบบจากที่อื่น — กรุณาเข้าใหม่", "err");
+  }
+
   async function api(path, options = {}) {
     const headers = Object.assign(
       { "Content-Type": "application/json" },
       options.headers || {}
     );
     if (accessToken) headers.Authorization = "Bearer " + accessToken;
+    if (sessionToken) headers["X-Session-Token"] = sessionToken;
     const res = await fetch(API + path, {
       ...options,
       headers,
@@ -50,8 +94,17 @@
       data = null;
     }
     if (!res.ok) {
-      const detail = data?.detail || data?.reason || res.statusText;
-      const err = new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      const raw = data?.detail || data?.reason || res.statusText;
+      const detail =
+        typeof raw === "string"
+          ? raw
+          : raw && typeof raw === "object"
+            ? raw.code || raw.message || JSON.stringify(raw)
+            : String(raw);
+      if (res.status === 401 && /session_replaced/i.test(String(detail))) {
+        await handleSessionReplaced();
+      }
+      const err = new Error(detail);
       err.status = res.status;
       err.data = data;
       throw err;
@@ -75,16 +128,23 @@
     const { data: sess } = await sb.auth.getSession();
     if (!sess?.session) return null;
     accessToken = sess.session.access_token;
+    sessionToken = loadStoredSessionToken();
     try {
       const me = await api("/api/me");
       if (me?.profile?.role !== "admin") {
         await sb.auth.signOut();
         accessToken = null;
+        persistSessionToken(null);
         return null;
       }
       return { session: sess.session, profile: me.profile };
-    } catch (_) {
-      await sb.auth.signOut();
+    } catch (e) {
+      if (!/session_replaced/i.test(String(e.message || ""))) {
+        try {
+          await sb.auth.signOut();
+        } catch (_) {}
+        persistSessionToken(null);
+      }
       accessToken = null;
       return null;
     }
@@ -96,6 +156,93 @@
     if (chip) chip.classList.toggle("hidden", !on);
   }
 
+  async function loadStuckTopups() {
+    const root = $("stuck-topups");
+    if (!root) return;
+    root.textContent = "กำลังโหลด…";
+    root.className = "admin-list muted";
+    try {
+      const data = await api("/api/admin/topups?status=needs_manual");
+      const items = data.items || [];
+      if (!items.length) {
+        root.textContent = "ไม่มีรายการค้าง";
+        return;
+      }
+      root.className = "admin-list";
+      root.innerHTML = items
+        .map((row) => {
+          const id = escapeHtml(row.id || "");
+          const baht = Number(row.amount_baht ?? 0);
+          const tokens = escapeHtml(row.tokens_credited || row.package_tokens || "—");
+          return (
+            '<div class="admin-row" data-redemption-id="' +
+            id +
+            '">' +
+            '<div class="admin-row-head">' +
+            "<strong>" +
+            tokens +
+            " Token · " +
+            escapeHtml(baht) +
+            "฿</strong>" +
+            '<button type="button" class="btn btn-candy" data-action="credit-retry">เครดิตซ้ำ</button>' +
+            "</div>" +
+            '<div class="muted">user: ' +
+            escapeHtml(row.user_id) +
+            " · " +
+            escapeHtml(formatDay(row.created_at)) +
+            "</div>" +
+            (row.error_note
+              ? '<div class="muted">' + escapeHtml(row.error_note) + "</div>"
+              : "") +
+            "</div>"
+          );
+        })
+        .join("");
+    } catch (e) {
+      root.textContent = e.message || String(e);
+    }
+  }
+
+  async function loadAudit() {
+    const root = $("audit-list");
+    if (!root) return;
+    root.textContent = "กำลังโหลด…";
+    root.className = "admin-list muted";
+    try {
+      const data = await api("/api/admin/audit?limit=40");
+      const items = data.items || [];
+      if (!items.length) {
+        root.textContent = "ยังไม่มี log";
+        return;
+      }
+      root.className = "admin-list";
+      root.innerHTML = items
+        .map((row) => {
+          const meta = row.meta ? JSON.stringify(row.meta) : "";
+          return (
+            '<div class="admin-row">' +
+            '<div class="admin-row-head"><strong>' +
+            escapeHtml(row.action) +
+            "</strong><span class=\"muted\">" +
+            escapeHtml(formatDay(row.created_at)) +
+            "</span></div>" +
+            '<div class="muted">actor: ' +
+            escapeHtml(row.actor_id || "—") +
+            " · target: " +
+            escapeHtml(row.target_user_id || "—") +
+            "</div>" +
+            (meta
+              ? '<div class="muted">' + escapeHtml(meta) + "</div>"
+              : "") +
+            "</div>"
+          );
+        })
+        .join("");
+    } catch (e) {
+      root.textContent = e.message || String(e);
+    }
+  }
+
   async function showDash(profile) {
     loginPanel.classList.add("hidden");
     dash.classList.remove("hidden");
@@ -103,7 +250,7 @@
     adminId = profile.id || null;
     $("who-user").textContent = profile.username || profile.display_name || "admin";
     initAccordions();
-    await loadUsers();
+    await Promise.all([loadUsers(), loadStuckTopups(), loadAudit()]);
   }
 
   function showLogin() {
@@ -201,6 +348,7 @@
       input.value = String(data.token_balance ?? next);
       input.setAttribute("data-orig", String(data.token_balance ?? next));
       setStatus(listStatus, "อัปเดตโทเค็นแล้ว: " + (data.token_balance ?? next), "ok");
+      loadAudit().catch(() => {});
     } catch (err) {
       setStatus(listStatus, err.message || String(err), "err");
     } finally {
@@ -221,7 +369,7 @@
         method: "DELETE",
       });
       setStatus(listStatus, "ลบแล้ว: " + name, "ok");
-      await loadUsers();
+      await Promise.all([loadUsers(), loadAudit()]);
     } catch (err) {
       setStatus(listStatus, err.message || String(err), "err");
     }
@@ -260,6 +408,7 @@
       });
       if (error) throw error;
       accessToken = data.access_token;
+      persistSessionToken(data.session_token || null);
       setStatus($("login-status"), "", "muted");
       await showDash(data.profile);
     } catch (err) {
@@ -273,6 +422,7 @@
   $("logout-btn").addEventListener("click", async () => {
     await sb.auth.signOut();
     accessToken = null;
+    persistSessionToken(null);
     showLogin();
     setStatus($("login-status"), "ออกจากระบบแล้ว", "muted");
   });
@@ -280,6 +430,36 @@
   $("refresh-btn").addEventListener("click", (e) => {
     e.stopPropagation();
     loadUsers();
+  });
+
+  $("refresh-stuck-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    loadStuckTopups();
+  });
+
+  $("refresh-audit-btn")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    loadAudit();
+  });
+
+  $("stuck-topups")?.addEventListener("click", async (e) => {
+    const btn = e.target.closest('[data-action="credit-retry"]');
+    if (!btn) return;
+    const row = btn.closest("[data-redemption-id]");
+    const id = row?.getAttribute("data-redemption-id");
+    if (!id) return;
+    btn.disabled = true;
+    try {
+      await api("/api/admin/topups/" + encodeURIComponent(id) + "/credit", {
+        method: "POST",
+        body: {},
+      });
+      await Promise.all([loadStuckTopups(), loadUsers(), loadAudit()]);
+    } catch (err) {
+      window.alert(err.message || String(err));
+    } finally {
+      btn.disabled = false;
+    }
   });
 
   $("create-form").addEventListener("submit", async (e) => {
@@ -302,7 +482,7 @@
       );
       $("create-form").reset();
       $("create-tokens").value = "0";
-      await loadUsers();
+      await Promise.all([loadUsers(), loadAudit()]);
     } catch (err) {
       setStatus($("create-status"), err.message || String(err), "err");
     } finally {
@@ -320,13 +500,45 @@
         $("lookup-result").textContent = data.reason || "not found";
         return;
       }
+      let topupHtml = "";
+      if (data.id) {
+        try {
+          const top = await api(
+            "/api/admin/users/" + encodeURIComponent(data.id) + "/topups"
+          );
+          const items = top.items || [];
+          if (items.length) {
+            topupHtml =
+              '<div class="lookup-topups"><strong>เติมล่าสุด</strong><ul>' +
+              items
+                .map((row) => {
+                  const st =
+                    row.credit_status === "needs_manual" ? "ต้องตามมือ" : "สำเร็จ";
+                  return (
+                    "<li>" +
+                    escapeHtml(formatDay(row.created_at)) +
+                    " · " +
+                    escapeHtml(row.tokens_credited || row.package_tokens) +
+                    "T · " +
+                    escapeHtml(row.amount_baht) +
+                    "฿ · " +
+                    st +
+                    "</li>"
+                  );
+                })
+                .join("") +
+              "</ul></div>";
+          }
+        } catch (_) {}
+      }
       $("lookup-result").innerHTML =
         "<strong>" +
         escapeHtml(data.username || q) +
         "</strong> · tokens: " +
         escapeHtml(data.token_balance) +
         " · role: " +
-        escapeHtml(data.role);
+        escapeHtml(data.role) +
+        topupHtml;
       $("credit-q").value = data.username || q;
     } catch (err) {
       $("lookup-result").textContent = err.message;
@@ -346,13 +558,14 @@
         },
       });
       setStatus($("credit-status"), "New balance: " + data.token_balance, "ok");
-      await loadUsers();
+      await Promise.all([loadUsers(), loadAudit()]);
     } catch (err) {
       setStatus($("credit-status"), err.message, "err");
     }
   });
 
   initAccordions();
+  sessionToken = loadStoredSessionToken();
 
   (async () => {
     const ctx = await requireAdminSession();

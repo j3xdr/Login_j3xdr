@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260722-cache" />
+  <link rel="stylesheet" href="./styles.css?v=20260722-secux" />
 </head>
 <body>
   <div class="bakery-bg" aria-hidden="true">
@@ -112,6 +112,45 @@
         <div class="tip-banner">
           <img src="assets/tr_ga170.png" alt="" width="36" height="36" />
           <p>หน้านี้สำหรับ <strong>แอดมินเท่านั้น</strong> — ผู้ใช้ทั่วไปเข้าผ่าน CKR WWDC</p>
+        </div>
+
+        <!-- 0. เติมค้าง / audit -->
+        <div class="panel accordion is-open" data-accordion>
+          <button type="button" class="accordion-toggle" aria-expanded="true">
+            <span class="panel-head">
+              <img src="assets/coin.png" alt="" width="32" height="32" />
+              <span>
+                <span class="panel-title">เติมค้าง / ต้องตามมือ</span>
+                <span class="panel-hint">ซองรับแล้วแต่เครดิตโทเค็นไม่สำเร็จ</span>
+              </span>
+            </span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div class="accordion-body">
+            <div class="admin-toolbar">
+              <button type="button" class="btn btn-ghost" id="refresh-stuck-btn">รีเฟรช</button>
+            </div>
+            <div id="stuck-topups" class="admin-list muted">กำลังโหลด…</div>
+          </div>
+        </div>
+
+        <div class="panel accordion" data-accordion>
+          <button type="button" class="accordion-toggle" aria-expanded="false">
+            <span class="panel-head">
+              <img src="assets/notice_b19.png" alt="" width="32" height="32" />
+              <span>
+                <span class="panel-title">Audit log</span>
+                <span class="panel-hint">การกระทำแอดมินล่าสุด</span>
+              </span>
+            </span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div class="accordion-body">
+            <div class="admin-toolbar">
+              <button type="button" class="btn btn-ghost" id="refresh-audit-btn">รีเฟรช</button>
+            </div>
+            <div id="audit-list" class="admin-list muted">กำลังโหลด…</div>
+          </div>
         </div>
 
         <!-- 1. เติมโทเค็น -->
@@ -222,7 +261,7 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./config.js?v=20260722-cache"></script>
-  <script src="./app.js?v=20260722-cache"></script>
+  <script src="./config.js?v=20260722-secux"></script>
+  <script src="./app.js?v=20260722-secux"></script>
 </body>
 </html>

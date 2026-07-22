@@ -645,6 +645,58 @@ input {
   font-family: var(--display);
 }
 
+.admin-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.admin-list {
+  display: grid;
+  gap: 8px;
+  font-size: 0.88rem;
+}
+
+.admin-row {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(10, 6, 4, 0.45);
+}
+
+.admin-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-row .muted {
+  font-size: 0.78rem;
+}
+
+.admin-row .btn {
+  min-height: 36px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+}
+
+.lookup-topups {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(246, 231, 200, 0.12);
+}
+
+.lookup-topups ul {
+  margin: 6px 0 0;
+  padding-left: 1.1rem;
+  color: var(--cream-dim);
+  font-size: 0.82rem;
+}
+
 /* ---- Buttons ---- */
 .btn {
   display: inline-flex;
