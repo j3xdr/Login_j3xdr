@@ -4,126 +4,222 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CKR Admin — Login_j3xdr</title>
-  <meta name="description" content="CKR WWDC admin — create users and manage tokens" />
+  <meta name="description" content="CKR WWDC admin — สร้างผู้ใช้และจัดการโทเค็น" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#1a0f0a" />
+  <link rel="icon" href="assets/logo_4k.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <div class="bg-crumb" aria-hidden="true"></div>
-  <main class="app">
-    <header class="brand">
-      <div class="brand-mark" aria-hidden="true">CK</div>
-      <h1>CKR Admin</h1>
-      <p>สร้างยูสเซอร์ · เติมโทเคน · เฉพาะ Admin (Login_j3xdr)</p>
-    </header>
+  <div class="bakery-bg" aria-hidden="true">
+    <div class="bakery-glow bakery-glow-a"></div>
+    <div class="bakery-glow bakery-glow-b"></div>
+    <div class="crumb-pattern"></div>
+  </div>
 
-    <section id="login-panel" class="panel">
-      <h2>เข้าสู่ระบบ Admin</h2>
-      <p class="hint">Username + Password — ไม่มีสมัครเองที่หน้านี้</p>
-      <form id="login-form" autocomplete="on">
-        <div class="field">
-          <label for="login-user">Username</label>
-          <input id="login-user" type="text" required placeholder="admin username" autocomplete="username" />
-        </div>
-        <div class="field">
-          <label for="login-pass">Password</label>
-          <input id="login-pass" type="password" required placeholder="••••••••" autocomplete="current-password" />
-        </div>
-        <div class="actions">
-          <button class="btn btn-primary" type="submit" id="login-btn">Sign in</button>
-        </div>
-        <div id="login-status" class="status muted" role="status"></div>
-      </form>
-    </section>
-
-    <section id="dash" class="hidden">
-      <div class="topbar">
-        <div class="who">Admin: <strong id="who-user"></strong></div>
-        <button type="button" class="btn btn-ghost" id="logout-btn">ออกจากระบบ</button>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="CKR Admin">
+      <img class="brand-logo" src="assets/logo_4k.png" width="48" height="48" alt="CKR WWDC" />
+      <span class="brand-text">
+        <span class="brand-title">CKR Admin</span>
+        <span class="brand-sub">จัดการโทเค็น</span>
+      </span>
+    </a>
+    <div class="topbar-actions">
+      <div id="nav-admin" class="token-chip hidden" title="โหมดแอดมิน">
+        <img src="assets/level.png" alt="" width="22" height="22" />
+        <span>Admin</span>
       </div>
+      <button type="button" id="logout-btn" class="btn btn-candy btn-logout hidden">ออกจากระบบ</button>
+    </div>
+  </header>
 
-      <section class="panel">
-        <h2>สร้างผู้ใช้</h2>
-        <p class="hint">Username + Password + โทเคนเริ่มต้น — ไม่ใช้ email สำหรับลูกค้า</p>
-        <form id="create-form">
-          <div class="grid-2">
-            <div class="field">
-              <label for="create-user">Username</label>
-              <input id="create-user" type="text" required minlength="2" placeholder="customer1" autocomplete="off" />
-            </div>
-            <div class="field">
-              <label for="create-pass">Password</label>
-              <input id="create-pass" type="password" required minlength="6" placeholder="อย่างน้อย 6 ตัว" autocomplete="new-password" />
-            </div>
-          </div>
-          <div class="field">
-            <label for="create-tokens">Initial tokens</label>
-            <input id="create-tokens" type="number" min="0" value="0" />
-          </div>
-          <div class="actions">
-            <button class="btn btn-primary" type="submit" id="create-btn">สร้างผู้ใช้</button>
-          </div>
-          <div id="create-status" class="status muted" role="status"></div>
-        </form>
-      </section>
-
-      <section class="panel">
-        <h2>เติมโทเคน</h2>
-        <p class="hint">ค้นหาด้วย username แล้วเพิ่มโทเคน</p>
-        <form id="lookup-form" class="inline-row">
-          <div class="field grow">
-            <label for="lookup-q">Lookup username</label>
-            <input id="lookup-q" type="text" required placeholder="username" />
-          </div>
-          <button class="btn btn-ghost" type="submit" style="align-self:flex-end">Find</button>
-        </form>
-        <div id="lookup-result" class="lookup-box muted">—</div>
-        <form id="credit-form" class="inline-row">
-          <div class="field grow">
-            <label for="credit-q">Username</label>
-            <input id="credit-q" type="text" required />
-          </div>
-          <div class="field narrow">
-            <label for="credit-amt">Tokens</label>
-            <input id="credit-amt" type="number" min="1" value="10" required />
-          </div>
-          <button class="btn btn-primary" type="submit" style="align-self:flex-end">Add tokens</button>
-        </form>
-        <div id="credit-status" class="status muted" role="status"></div>
-      </section>
-
-      <section class="panel">
-        <div class="topbar" style="margin-bottom: 0.75rem">
-          <div>
-            <h2 style="margin:0">รายชื่อผู้ใช้</h2>
-            <p class="hint" style="margin:0.25rem 0 0">Username · Role · Tokens</p>
-          </div>
-          <button type="button" class="btn btn-ghost" id="refresh-btn">รีเฟรช</button>
+  <main class="shell">
+    <!-- LOGIN -->
+    <section id="login-panel" class="view">
+      <div class="login-stage">
+        <div class="login-hero">
+          <img class="hero-logo" src="assets/logo_4k.png" width="160" height="160" alt="CKR WWDC" />
+          <h1 class="hero-title">CKR Admin</h1>
+          <p class="hero-lead">สร้างยูสเซอร์ · เติมโทเค็น · เฉพาะแอดมิน</p>
+          <p class="hero-note">Login_j3xdr · ใช้ร่วมกับระบบ CKR WWDC</p>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Username</th>
-                <th>Role</th>
-                <th>Tokens</th>
-              </tr>
-            </thead>
-            <tbody id="users-body">
-              <tr><td colspan="3" style="color:var(--muted)">กำลังโหลด…</td></tr>
-            </tbody>
-          </table>
+
+        <div class="panel login-panel">
+          <div class="panel-ribbon" aria-hidden="true">
+            <img src="assets/crc_cookie_stone_box.png" alt="" />
+          </div>
+          <h2 class="panel-title">เข้าสู่ระบบ Admin</h2>
+          <p class="panel-hint">ใส่ชื่อผู้ใช้และรหัสผ่านแอดมิน — ไม่มีสมัครเอง</p>
+          <form id="login-form" autocomplete="on">
+            <label class="field">
+              <span>ชื่อผู้ใช้</span>
+              <input
+                id="login-user"
+                name="username"
+                type="text"
+                required
+                autocomplete="username"
+                placeholder="ชื่อผู้ใช้แอดมิน"
+                spellcheck="false"
+              />
+            </label>
+            <label class="field">
+              <span>รหัสผ่าน</span>
+              <input
+                id="login-pass"
+                name="password"
+                type="password"
+                required
+                autocomplete="current-password"
+                placeholder="••••••••"
+              />
+            </label>
+            <button class="btn btn-candy" type="submit" id="login-btn">
+              <img src="assets/icon_giftpoint.png" alt="" width="20" height="20" />
+              เข้าสู่ระบบ
+            </button>
+            <p id="login-status" class="status muted" role="status"></p>
+          </form>
         </div>
-        <div id="list-status" class="status muted" role="status"></div>
-      </section>
+      </div>
     </section>
 
-    <footer class="note">
-      CKR WWDC token admin · API on Render · Login_j3xdr
-    </footer>
+    <!-- DASHBOARD -->
+    <section id="dash" class="view hidden">
+      <div class="app-flow">
+        <div class="status-strip panel">
+          <div class="status-strip-user">
+            <img class="who-avatar" src="assets/logo_4k.png" alt="" width="44" height="44" />
+            <div>
+              <p class="eyebrow">แอดมิน</p>
+              <p id="who-user" class="who-name">—</p>
+            </div>
+          </div>
+          <div class="status-strip-tokens">
+            <p class="eyebrow">
+              <img src="assets/coin.png" alt="" width="18" height="18" />
+              ระบบโทเค็น
+            </p>
+            <p class="vault-num vault-num-sm">Admin</p>
+            <p class="muted">สร้างผู้ใช้ · เติมโทเค็น</p>
+          </div>
+        </div>
+
+        <div class="tip-banner">
+          <img src="assets/tr_ga170.png" alt="" width="36" height="36" />
+          <p>หน้านี้สำหรับ <strong>แอดมินเท่านั้น</strong> — ผู้ใช้ทั่วไปเข้าผ่าน CKR WWDC</p>
+        </div>
+
+        <!-- 1. เติมโทเค็น -->
+        <div class="panel accordion is-open" data-accordion>
+          <button type="button" class="accordion-toggle" aria-expanded="true">
+            <span class="panel-head">
+              <img src="assets/coin.png" alt="" width="32" height="32" />
+              <span>
+                <span class="panel-title">เติมโทเค็น</span>
+                <span class="panel-hint">ค้นหาด้วยชื่อผู้ใช้ แล้วเพิ่มโทเค็น</span>
+              </span>
+            </span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div class="accordion-body">
+            <form id="lookup-form" class="inline-row">
+              <label class="field grow">
+                <span>ค้นหาชื่อผู้ใช้</span>
+                <input id="lookup-q" type="text" required placeholder="username" spellcheck="false" />
+              </label>
+              <button class="btn btn-ghost" type="submit">ค้นหา</button>
+            </form>
+            <div id="lookup-result" class="lookup-box muted">—</div>
+            <form id="credit-form" class="inline-row">
+              <label class="field grow">
+                <span>ชื่อผู้ใช้</span>
+                <input id="credit-q" type="text" required spellcheck="false" />
+              </label>
+              <label class="field narrow">
+                <span>โทเค็น</span>
+                <input id="credit-amt" type="number" min="1" value="10" required />
+              </label>
+              <button class="btn btn-candy" type="submit">เติมโทเค็น</button>
+            </form>
+            <p id="credit-status" class="status muted" role="status"></p>
+          </div>
+        </div>
+
+        <!-- 2. รายชื่อผู้ใช้ -->
+        <div class="panel accordion is-open" data-accordion>
+          <div class="accordion-toggle-row">
+            <button type="button" class="accordion-toggle" aria-expanded="true">
+              <span class="panel-head">
+                <img src="assets/notice_b19.png" alt="" width="32" height="32" />
+                <span>
+                  <span class="panel-title">รายชื่อผู้ใช้</span>
+                  <span class="panel-hint">แก้โทเค็น · ลบผู้ใช้ได้จากรายการ</span>
+                </span>
+              </span>
+              <span class="chevron" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="btn btn-ghost btn-refresh" id="refresh-btn">รีเฟรช</button>
+          </div>
+          <div class="accordion-body">
+            <div id="users-body" class="user-items" aria-live="polite">
+              <p class="muted user-items-empty">กำลังโหลด…</p>
+            </div>
+            <p id="list-status" class="status muted" role="status"></p>
+          </div>
+        </div>
+
+        <!-- 3. สร้างผู้ใช้ (default ย่อ) -->
+        <div class="panel accordion" data-accordion>
+          <button type="button" class="accordion-toggle" aria-expanded="false">
+            <span class="panel-head">
+              <img src="assets/score.png" alt="" width="32" height="32" />
+              <span>
+                <span class="panel-title">สร้างผู้ใช้</span>
+                <span class="panel-hint">Username + Password + โทเค็นเริ่มต้น</span>
+              </span>
+            </span>
+            <span class="chevron" aria-hidden="true"></span>
+          </button>
+          <div class="accordion-body">
+            <form id="create-form">
+              <div class="grid-2">
+                <label class="field">
+                  <span>ชื่อผู้ใช้</span>
+                  <input id="create-user" type="text" required minlength="2" placeholder="customer1" autocomplete="off" spellcheck="false" />
+                </label>
+                <label class="field">
+                  <span>รหัสผ่าน</span>
+                  <input id="create-pass" type="password" required minlength="6" placeholder="อย่างน้อย 6 ตัว" autocomplete="new-password" />
+                </label>
+              </div>
+              <label class="field">
+                <span>
+                  <img src="assets/coin.png" alt="" width="16" height="16" />
+                  โทเค็นเริ่มต้น
+                </span>
+                <input id="create-tokens" type="number" min="0" value="0" />
+              </label>
+              <button class="btn btn-run" type="submit" id="create-btn">
+                <img src="assets/icon_giftpoint.png" alt="" width="20" height="20" />
+                สร้างผู้ใช้
+              </button>
+              <p id="create-status" class="status muted" role="status"></p>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
+
+  <footer class="footer">
+    <img src="assets/logo_4k.png" alt="" width="28" height="28" />
+    <p>CKR WWDC Admin · Login_j3xdr by j3da1</p>
+  </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js"></script>
