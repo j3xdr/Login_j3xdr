@@ -1,1 +1,43 @@
-# Login_j3xdr
+# CKR Admin Console (Login_j3xdr)
+
+แดชบอร์ดแอดมินแบบ POS — สลับโหมดระหว่าง **เติมวัน (PC)** กับ **เติมโทเค็น (Web)**
+
+## Preview ท้องถิ่น
+
+```bash
+cd Login_j3xdr
+python -m http.server 5179 --bind 127.0.0.1
+```
+
+เปิด [http://127.0.0.1:5179/](http://127.0.0.1:5179/)
+
+## โหมดการทำงาน
+
+| โหมด | ใช้ทำ | Backend |
+|------|--------|---------|
+| **เติมวัน (PC)** | สร้างผู้ใช้, ต่ออายุ (วัน/ชม./นาที), ถาวร, ตัดสิทธิ์ | Supabase Edge `admin-register` + RPC `admin_extend_rental` |
+| **เติมโทเค็น (Web)** | ค้นหา / เติม / ตั้งยอดโทเค็น, เติมค้าง | Render `API_BASE` `/api/admin/*` |
+
+สวิตช์โหมดอยู่แถบบน — จำค่าล่าสุดใน `localStorage` (`ckr_admin_mode`)
+
+## เมนู
+
+- **ภาพรวม** — KPI + สถิติวันนี้  
+- **ผู้ใช้** — ตาราง (คอลัมน์เปลี่ยนตามโหมด)  
+- **แคชเชียร์** — ฟอร์มเปิดสิทธิ์ / เติมโทเค็น + ใบเสร็จย่อ  
+- **ระบบ** — maintenance, audit, (โหมดโทเค็น) เติมค้าง  
+
+## Deploy ที่จำเป็น (ครั้งแรก / หลังอัปเดต)
+
+1. Apply SQL จาก `supabase/schema.sql` (หรือ migration ที่มี `admin_extend_rental`)  
+2. Deploy Edge:
+
+```bash
+npx supabase functions deploy admin-register --project-ref <project-ref>
+```
+
+อย่าใส่ `service_role` ใน `config.js`
+
+## Config
+
+`config.js` มีแค่ anon key + `API_BASE` (Render) สำหรับ login / token admin  

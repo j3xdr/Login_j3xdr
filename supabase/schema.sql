@@ -3,8 +3,9 @@
 -- Internal Auth email may be synthetic: {sanitized}@users.ckr.local
 -- Admin username is set to their existing auth email string
 -- Roles: admin | normal
--- No self-registration — admin creates users via Render /api/admin/create-user
--- 1 token = 1 farm run
+-- No self-registration — admin creates users via Edge admin-register (day rental)
+-- PC entitlement: is_permanent OR (expires_at > now()); banned_at blocks access
+-- token_balance remains for legacy web topup (not PC rental focus)
 
 -- ---------------------------------------------------------------------------
 -- Base profiles (idempotent)
@@ -14,6 +15,7 @@ create table if not exists public.profiles (
   role text not null default 'normal' check (role in ('admin', 'normal')),
   is_permanent boolean not null default false,
   expires_at timestamptz null,
+  banned_at timestamptz null,
   device_id text null,
   session_token text null,
   last_seen_at timestamptz null,
@@ -29,7 +31,14 @@ alter table public.profiles
   add column if not exists username text,
   add column if not exists display_name text,
   add column if not exists token_balance integer not null default 0
-    check (token_balance >= 0);
+    check (token_balance >= 0),
+  add column if not exists is_permanent boolean not null default false,
+  add column if not exists expires_at timestamptz null,
+  add column if not exists banned_at timestamptz null;
+
+create index if not exists profiles_expires_at_idx
+  on public.profiles (expires_at)
+  where expires_at is not null;
 
 create unique index if not exists profiles_username_lower_uidx
   on public.profiles (lower(username))
@@ -328,6 +337,9 @@ begin
     'display_name', p.display_name,
     'role', p.role,
     'token_balance', p.token_balance,
+    'is_permanent', p.is_permanent,
+    'expires_at', p.expires_at,
+    'banned_at', p.banned_at,
     'created_at', p.created_at
   )
   into row_json
@@ -367,6 +379,156 @@ $$;
 
 revoke all on function public.admin_list_profiles() from public;
 grant execute on function public.admin_list_profiles() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Day-rental helpers (PC entitlement)
+-- ---------------------------------------------------------------------------
+create or replace function public.rental_is_active(
+  p_is_permanent boolean,
+  p_expires_at timestamptz,
+  p_banned_at timestamptz default null
+)
+returns boolean
+language sql
+immutable
+as $$
+  select p_banned_at is null
+    and (
+      coalesce(p_is_permanent, false) = true
+      or (p_expires_at is not null and p_expires_at > now())
+    );
+$$;
+
+create or replace function public.admin_extend_rental(
+  p_username text,
+  p_days integer default 0,
+  p_hours integer default 0,
+  p_minutes integer default 0,
+  p_seconds integer default 0,
+  p_permanent boolean default false,
+  p_revoke boolean default false
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  q text := lower(trim(coalesce(p_username, '')));
+  jwt_role text := coalesce(auth.role(), '');
+  caller uuid := auth.uid();
+  row_rec public.profiles%rowtype;
+  days_i integer := greatest(coalesce(p_days, 0), 0);
+  hours_i integer := greatest(coalesce(p_hours, 0), 0);
+  minutes_i integer := greatest(coalesce(p_minutes, 0), 0);
+  seconds_i integer := greatest(coalesce(p_seconds, 0), 0);
+  delta interval;
+  base_ts timestamptz;
+  next_exp timestamptz;
+begin
+  if jwt_role = 'service_role' then
+    null;
+  elsif caller is not null and public.is_admin() then
+    null;
+  else
+    return jsonb_build_object('ok', false, 'reason', 'admin_only');
+  end if;
+
+  if length(q) < 2 then
+    return jsonb_build_object('ok', false, 'reason', 'username_too_short');
+  end if;
+
+  select * into row_rec
+  from public.profiles p
+  where lower(coalesce(p.username, '')) = q
+     or lower(coalesce(p.email, '')) = q
+  order by case when lower(coalesce(p.username, '')) = q then 0 else 1 end
+  limit 1;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'reason', 'user_not_found');
+  end if;
+
+  if p_revoke then
+    update public.profiles
+    set is_permanent = false,
+        expires_at = now()
+    where id = row_rec.id
+    returning * into row_rec;
+
+    return jsonb_build_object(
+      'ok', true,
+      'action', 'revoke',
+      'id', row_rec.id,
+      'username', row_rec.username,
+      'is_permanent', row_rec.is_permanent,
+      'expires_at', row_rec.expires_at
+    );
+  end if;
+
+  if p_permanent then
+    update public.profiles
+    set is_permanent = true,
+        expires_at = null
+    where id = row_rec.id
+    returning * into row_rec;
+
+    return jsonb_build_object(
+      'ok', true,
+      'action', 'make_permanent',
+      'id', row_rec.id,
+      'username', row_rec.username,
+      'is_permanent', row_rec.is_permanent,
+      'expires_at', row_rec.expires_at
+    );
+  end if;
+
+  if days_i = 0 and hours_i = 0 and minutes_i = 0 and seconds_i = 0 then
+    return jsonb_build_object('ok', false, 'reason', 'rental_duration_required');
+  end if;
+
+  delta := make_interval(
+    days => days_i,
+    hours => hours_i,
+    mins => minutes_i,
+    secs => seconds_i
+  );
+
+  -- Active rental: extend from max(expires_at, now()); expired/unset: from now()
+  if coalesce(row_rec.is_permanent, false) then
+    base_ts := now();
+  elsif row_rec.expires_at is not null and row_rec.expires_at > now() then
+    base_ts := row_rec.expires_at;
+  else
+    base_ts := now();
+  end if;
+
+  next_exp := base_ts + delta;
+
+  update public.profiles
+  set is_permanent = false,
+      expires_at = next_exp
+  where id = row_rec.id
+  returning * into row_rec;
+
+  return jsonb_build_object(
+    'ok', true,
+    'action', 'extend',
+    'id', row_rec.id,
+    'username', row_rec.username,
+    'is_permanent', row_rec.is_permanent,
+    'expires_at', row_rec.expires_at,
+    'added_days', days_i,
+    'added_hours', hours_i,
+    'added_minutes', minutes_i,
+    'added_seconds', seconds_i
+  );
+end;
+$$;
+
+revoke all on function public.admin_extend_rental(text, integer, integer, integer, integer, boolean, boolean) from public;
+grant execute on function public.admin_extend_rental(text, integer, integer, integer, integer, boolean, boolean) to authenticated;
+grant execute on function public.admin_extend_rental(text, integer, integer, integer, integer, boolean, boolean) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- RLS

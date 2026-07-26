@@ -1,64 +1,24 @@
-/* CKR Admin — Login_j3xdr (token system via Render API) */
+/* CKR Admin Console — POS dashboard (day rental + tokens) */
 (function () {
   "use strict";
 
   const cfg = window.PARTYRUN_CONFIG;
   if (!cfg?.SUPABASE_URL || !cfg?.SUPABASE_ANON_KEY) {
-    document.body.innerHTML = "<p style='color:#f88;padding:2rem'>Missing config.js</p>";
+    document.body.innerHTML =
+      "<p style='color:#f88;padding:2rem;font-family:sans-serif'>Missing config.js</p>";
     return;
   }
 
   const API = cfg.API_BASE || "";
   const SESSION_KEY = "ckr_admin_session_token";
-  const MOTION_CLOSE_MS = 320;
+  const MODE_KEY = "ckr_admin_mode";
+  const EDGE_ADMIN_FN = "admin-register";
   const { createClient } = supabase;
   const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
   const $ = (id) => document.getElementById(id);
-  const loginPanel = $("login-panel");
-  const dash = $("dash");
-  const modalRoot = $("modal-root");
-  const modalTitle = $("modal-title");
-  const modalBody = $("modal-body");
-  const modalIcon = $("modal-icon");
-  const modalActions = $("modal-actions");
-  const modalCard = modalRoot?.querySelector(".modal-card") || null;
 
-  let accessToken = null;
-  let sessionToken = null;
-  let adminId = null;
-  let apiReady = false;
-  let modalMode = null;
-  let modalResolver = null;
-
-  function setStatus(el, text, kind) {
-    if (!el) return;
-    el.textContent = text || "";
-    el.className = "status " + (kind || "muted");
-    if (text) {
-      el.classList.remove("is-fresh");
-      void el.offsetWidth;
-      el.classList.add("is-fresh");
-    }
-  }
-
-  function escapeHtml(s) {
-    return String(s ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-
-  function prefersReducedMotion() {
-    try {
-      return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  /* ---------- Adaptive floating bg (assets_web/bg) ---------- */
+  /* Floating bg deco — assets_web/bg (parent folder) */
   const BG_FLOAT_BASE = "assets_web/bg/";
   const BG_FLOAT_COUNT = 70;
   const BG_EDGE_ZONES = [
@@ -81,9 +41,9 @@
   }
 
   function bgFloatSizeRange(w) {
-    if (w < 480) return [36, 52];
-    if (w < 768) return [40, 60];
-    return [44, 72];
+    if (w < 480) return [32, 48];
+    if (w < 768) return [36, 54];
+    return [40, 64];
   }
 
   function shuffleInPlace(arr) {
@@ -131,15 +91,11 @@
         img.draggable = false;
         img.src = `${BG_FLOAT_BASE}upgrade02_${n}_shop.png`;
         const width = Math.round(randBetween(minW, maxW));
-        const top = randBetween(zone.top[0], zone.top[1]);
-        const left = randBetween(zone.left[0], zone.left[1]);
-        const duration = randBetween(9, 16);
-        const delay = -randBetween(0, 12);
         img.style.width = `${width}px`;
-        img.style.top = `${top}%`;
-        img.style.left = `${left}%`;
-        img.style.animationDuration = `${duration.toFixed(1)}s`;
-        img.style.animationDelay = `${delay.toFixed(1)}s`;
+        img.style.top = `${randBetween(zone.top[0], zone.top[1])}%`;
+        img.style.left = `${randBetween(zone.left[0], zone.left[1])}%`;
+        img.style.animationDuration = `${9 + Math.random() * 5}s`;
+        img.style.animationDelay = `${-Math.random() * 8}s`;
         root.appendChild(img);
       }
     }
@@ -151,37 +107,40 @@
     });
   }
 
-  function animateOpen(root) {
-    if (!root) return;
-    root.classList.remove("hidden", "is-closing");
-    root.setAttribute("aria-hidden", "false");
-    void root.offsetWidth;
-    requestAnimationFrame(() => {
-      root.classList.add("is-open");
-    });
+  const loginPanel = $("login-panel");
+  const dash = $("dash");
+  const modalRoot = $("modal-root");
+  const modalTitle = $("modal-title");
+  const modalBody = $("modal-body");
+  const modalIcon = $("modal-icon");
+  const modalActions = $("modal-actions");
+  const modalCard = modalRoot?.querySelector(".modal-card") || null;
+
+  let accessToken = null;
+  let sessionToken = null;
+  let adminId = null;
+  let apiReady = false;
+  let modalMode = null;
+  let modalResolver = null;
+  let adminMode = localStorage.getItem(MODE_KEY) === "token" ? "token" : "day";
+  let currentView = "overview";
+  let cachedUsers = [];
+  let lastStats = null;
+
+  function setStatus(el, text, kind) {
+    if (!el) return;
+    el.textContent = text || "";
+    el.className = "status " + (kind || "muted");
   }
 
-  function animateClose(root, onDone, opts = {}) {
-    const instant = !!opts.instant || prefersReducedMotion();
-    if (!root) {
-      if (typeof onDone === "function") onDone();
-      return;
-    }
-    const finish = () => {
-      root.classList.add("hidden");
-      root.classList.remove("is-open", "is-closing");
-      root.setAttribute("aria-hidden", "true");
-      if (typeof onDone === "function") onDone();
-    };
-    if (instant || root.classList.contains("hidden")) {
-      finish();
-      return;
-    }
-    root.classList.add("is-closing");
-    setTimeout(finish, MOTION_CLOSE_MS);
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 
-  /* ---------- API health chip ---------- */
   function paintApiStatus(state, text) {
     const el = $("api-status");
     if (!el) return;
@@ -191,104 +150,73 @@
 
   async function pingApiHealth(retries) {
     const tries = Math.max(1, Number(retries) || 1);
-    paintApiStatus("waking", "กำลังปลุกเซิร์ฟเวอร์…");
+    paintApiStatus("waking", "กำลังปลุก API…");
     for (let i = 0; i < tries; i++) {
-      const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
-      const timer = setTimeout(() => {
-        try {
-          ctrl?.abort();
-        } catch (_) {}
-      }, 4500);
       try {
-        const res = await fetch(API + "/api/health", {
-          method: "GET",
-          signal: ctrl?.signal,
-        });
-        clearTimeout(timer);
+        const res = await fetch(API + "/api/health", { method: "GET" });
         if (res.ok) {
           apiReady = true;
           paintApiStatus("ready", "API พร้อม");
           return true;
         }
-      } catch (_) {
-        clearTimeout(timer);
-      }
-      if (i < tries - 1) {
-        paintApiStatus("waking", "กำลังปลุกเซิร์ฟเวอร์…");
-        await new Promise((r) => setTimeout(r, 1200));
-      }
+      } catch (_) {}
+      if (i < tries - 1) await new Promise((r) => setTimeout(r, 1000));
     }
     apiReady = false;
-    paintApiStatus("down", "API ยังไม่พร้อม");
+    paintApiStatus("down", "API ไม่พร้อม");
     return false;
   }
 
-  /* ---------- Modal system ---------- */
+  async function ensureApiReady() {
+    if (apiReady) return true;
+    return pingApiHealth(2);
+  }
+
+  /* ---- Modal ---- */
   function clearModalActions() {
-    if (!modalActions) return;
-    modalActions.innerHTML = "";
-    modalActions.className = "modal-actions";
+    if (modalActions) {
+      modalActions.innerHTML = "";
+      modalActions.className = "modal-actions";
+    }
   }
 
   function makeBtn(label, className, onClick) {
     const el = document.createElement("button");
     el.type = "button";
-    el.className = "btn " + className;
+    el.className = className || "btn btn-primary";
+    el.textContent = label;
     el.addEventListener("click", onClick);
-    el.appendChild(document.createTextNode(label));
     return el;
   }
 
   function settleModal(value) {
-    const resolve = modalResolver;
+    const r = modalResolver;
     modalResolver = null;
-    if (typeof resolve === "function") resolve(value);
+    if (r) r(value);
   }
 
   function openModal({ mode, title, body, icon, locked, bodyHtml }) {
-    if (!modalRoot) return;
     modalMode = mode;
-    if (modalTitle) modalTitle.textContent = title;
-    if (modalBody) {
-      if (bodyHtml) modalBody.innerHTML = bodyHtml;
-      else modalBody.textContent = body || "";
-    }
-    if (modalIcon) modalIcon.src = icon || "assets/coin.png";
-    modalRoot.classList.toggle("locked", !!locked);
+    modalTitle.textContent = title;
+    if (bodyHtml) modalBody.innerHTML = bodyHtml;
+    else modalBody.textContent = body || "";
+    modalIcon.src = icon || "assets/coin.png";
+    modalRoot.classList.remove("hidden");
+    modalRoot.setAttribute("aria-hidden", "false");
     const closeBtn = $("modal-close");
-    if (closeBtn) {
-      closeBtn.classList.toggle("is-hidden", !!locked);
-      closeBtn.disabled = !!locked;
-    }
-    if (modalCard) {
-      modalCard.classList.remove("is-shake");
-      void modalCard.offsetWidth;
-      if (mode === "error") modalCard.classList.add("is-shake");
-    }
-    animateOpen(modalRoot);
+    if (closeBtn) closeBtn.classList.toggle("hidden", !!locked);
   }
 
   function forceCloseModal() {
     modalMode = null;
     clearModalActions();
-    animateClose(
-      modalRoot,
-      () => {
-        if (modalRoot) modalRoot.classList.remove("locked");
-        if (modalCard) modalCard.classList.remove("is-shake");
-      },
-      { instant: true }
-    );
+    modalRoot.classList.add("hidden");
+    modalRoot.setAttribute("aria-hidden", "true");
   }
 
   function closeModalAndSettle(value) {
-    modalMode = null;
-    clearModalActions();
-    animateClose(modalRoot, () => {
-      if (modalRoot) modalRoot.classList.remove("locked");
-      if (modalCard) modalCard.classList.remove("is-shake");
-      settleModal(value);
-    });
+    forceCloseModal();
+    settleModal(value);
   }
 
   function showConfirmModal({
@@ -298,34 +226,29 @@
     cancelLabel,
     danger,
     icon,
-  } = {}) {
+  }) {
     return new Promise((resolve) => {
       modalResolver = resolve;
       clearModalActions();
       openModal({
         mode: "confirm",
-        title: title || "ยืนยัน?",
+        title: title || "ยืนยัน",
         body: body || "",
         icon: icon || "assets/notice_b19.png",
-        locked: false,
       });
-      if (modalActions) {
-        modalActions.classList.add("row");
-        modalActions.appendChild(
-          makeBtn(cancelLabel || "ยกเลิก", "btn-ghost", () => {
-            closeModalAndSettle(false);
-          })
-        );
-        modalActions.appendChild(
-          makeBtn(
-            confirmLabel || "ยืนยัน",
-            danger ? "btn-danger" : "btn-candy",
-            () => {
-              closeModalAndSettle(true);
-            }
-          )
-        );
-      }
+      modalActions.classList.add("row");
+      modalActions.appendChild(
+        makeBtn(cancelLabel || "ยกเลิก", "btn btn-ghost", () =>
+          closeModalAndSettle(false)
+        )
+      );
+      modalActions.appendChild(
+        makeBtn(
+          confirmLabel || "ยืนยัน",
+          danger ? "btn btn-danger" : "btn btn-primary",
+          () => closeModalAndSettle(true)
+        )
+      );
     });
   }
 
@@ -337,53 +260,37 @@
     confirmLabel,
     cancelLabel,
     icon,
-  } = {}) {
+  }) {
     return new Promise((resolve) => {
       modalResolver = resolve;
       clearModalActions();
-      const inputId = "modal-prompt-input";
       openModal({
         mode: "prompt",
         title: title || "กรอกข้อมูล",
+        body: "",
         bodyHtml:
           "<p>" +
           escapeHtml(body || "") +
-          '</p><input id="' +
-          inputId +
-          '" class="modal-prompt-input" type="text" placeholder="' +
-          escapeHtml(placeholder || "") +
-          '" value="' +
-          escapeHtml(defaultValue || "") +
-          '" />',
-        icon: icon || "assets/notice_b19.png",
-        locked: false,
+          '</p><input class="prompt-input" id="modal-prompt-input" type="text" />',
+        icon: icon || "assets/score.png",
       });
-      const input = $(inputId);
+      const input = $("modal-prompt-input");
       if (input) {
-        requestAnimationFrame(() => {
-          input.focus();
-          input.select();
-        });
-        input.addEventListener("keydown", (ev) => {
-          if (ev.key === "Enter") {
-            ev.preventDefault();
-            closeModalAndSettle(input.value);
-          }
-        });
+        input.placeholder = placeholder || "";
+        input.value = defaultValue || "";
+        setTimeout(() => input.focus(), 30);
       }
-      if (modalActions) {
-        modalActions.classList.add("row");
-        modalActions.appendChild(
-          makeBtn(cancelLabel || "ยกเลิก", "btn-ghost", () => {
-            closeModalAndSettle(null);
-          })
-        );
-        modalActions.appendChild(
-          makeBtn(confirmLabel || "ตกลง", "btn-candy", () => {
-            closeModalAndSettle(input ? input.value : "");
-          })
-        );
-      }
+      modalActions.classList.add("row");
+      modalActions.appendChild(
+        makeBtn(cancelLabel || "ยกเลิก", "btn btn-ghost", () =>
+          closeModalAndSettle(null)
+        )
+      );
+      modalActions.appendChild(
+        makeBtn(confirmLabel || "ตกลง", "btn btn-primary", () => {
+          closeModalAndSettle(input ? input.value : "");
+        })
+      );
     });
   }
 
@@ -396,33 +303,25 @@
         title: title || "แจ้งเตือน",
         body: body || "",
         icon: icon || "assets/notice_b19.png",
-        locked: false,
       });
-      if (modalActions) {
-        modalActions.appendChild(
-          makeBtn(confirmLabel || "ตกลง", "btn-candy", () => {
-            closeModalAndSettle(undefined);
-          })
-        );
-      }
+      modalActions.appendChild(
+        makeBtn(confirmLabel || "ตกลง", "btn btn-primary", () =>
+          closeModalAndSettle(true)
+        )
+      );
     });
   }
 
   $("modal-close")?.addEventListener("click", () => {
-    if (modalMode === "confirm") closeModalAndSettle(false);
-    else if (modalMode === "prompt") closeModalAndSettle(null);
-    else closeModalAndSettle(undefined);
+    if (modalMode === "prompt") closeModalAndSettle(null);
+    else if (modalMode === "confirm") closeModalAndSettle(false);
+    else closeModalAndSettle(true);
   });
 
-  modalRoot?.querySelector(".modal-backdrop")?.addEventListener("click", () => {
-    if (modalMode === "confirm") closeModalAndSettle(false);
-    else if (modalMode === "prompt") closeModalAndSettle(null);
-    else if (modalMode === "alert" || modalMode === "error") closeModalAndSettle(undefined);
-  });
-
+  /* ---- Session / API ---- */
   function loadStoredSessionToken() {
     try {
-      return localStorage.getItem(SESSION_KEY) || null;
+      return sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
     } catch (_) {
       return null;
     }
@@ -431,24 +330,111 @@
   function persistSessionToken(token) {
     sessionToken = token || null;
     try {
-      if (!sessionToken) localStorage.removeItem(SESSION_KEY);
-      else localStorage.setItem(SESSION_KEY, sessionToken);
+      if (!token) {
+        sessionStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(SESSION_KEY);
+      } else {
+        sessionStorage.setItem(SESSION_KEY, token);
+      }
     } catch (_) {}
   }
 
   function formatDay(iso) {
+    if (!iso) return "—";
     try {
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return "—";
-      return d.toLocaleString("th-TH", {
+      return new Date(iso).toLocaleString("th-TH", {
+        timeZone: "Asia/Bangkok",
         day: "2-digit",
-        month: "short",
+        month: "2-digit",
+        year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
       });
     } catch (_) {
       return "—";
     }
+  }
+
+  function readDuration(prefix) {
+    return {
+      days: Math.max(0, Math.floor(Number($(prefix + "-days")?.value) || 0)),
+      hours: Math.max(0, Math.floor(Number($(prefix + "-hours")?.value) || 0)),
+      minutes: Math.max(0, Math.floor(Number($(prefix + "-minutes")?.value) || 0)),
+    };
+  }
+
+  function hasDuration(d) {
+    return (d.days || 0) > 0 || (d.hours || 0) > 0 || (d.minutes || 0) > 0;
+  }
+
+  function formatRemaining(expiresAt) {
+    if (!expiresAt) return "—";
+    const exp = new Date(expiresAt);
+    if (Number.isNaN(exp.getTime())) return "—";
+    const ms = exp.getTime() - Date.now();
+    if (ms <= 0) return "หมดอายุ";
+    const totalMin = Math.floor(ms / 60000);
+    const days = Math.floor(totalMin / (60 * 24));
+    const hours = Math.floor((totalMin % (60 * 24)) / 60);
+    const mins = totalMin % 60;
+    const parts = [];
+    if (days) parts.push(days + " วัน");
+    if (hours) parts.push(hours + " ชม.");
+    if (mins || !parts.length) parts.push(mins + " นาที");
+    return "เหลือ " + parts.join(" ");
+  }
+
+  function rentalStatus(u) {
+    if (u.banned_at) {
+      return { kind: "banned", label: "ถูกแบน", detail: formatDay(u.banned_at) };
+    }
+    if (u.is_permanent) {
+      return { kind: "permanent", label: "ถาวร", detail: "ไม่หมดอายุ" };
+    }
+    if (!u.expires_at) {
+      return { kind: "unset", label: "ยังไม่ตั้งวัน", detail: "—" };
+    }
+    const exp = new Date(u.expires_at);
+    if (Number.isNaN(exp.getTime()) || exp.getTime() <= Date.now()) {
+      return { kind: "expired", label: "หมดอายุ", detail: formatDay(u.expires_at) };
+    }
+    return {
+      kind: "active",
+      label: formatRemaining(u.expires_at),
+      detail: "หมด " + formatDay(u.expires_at),
+    };
+  }
+
+  function syncDurationVisibility(prefix) {
+    const permanent = !!$(prefix + "-permanent")?.checked;
+    const block = $(prefix + "-duration-block");
+    if (block) block.classList.toggle("is-disabled", permanent);
+    ["days", "hours", "minutes"].forEach((k) => {
+      const el = $(prefix + "-" + k);
+      if (el) el.disabled = permanent;
+    });
+  }
+
+  function describeRentalUser(u) {
+    const st = rentalStatus(u);
+    return (
+      "<strong>" +
+      escapeHtml(u.username || "—") +
+      "</strong> · " +
+      escapeHtml(st.label) +
+      (st.detail && st.detail !== "—"
+        ? ' <span class="muted">(' + escapeHtml(st.detail) + ")</span>"
+        : "") +
+      " · บทบาท: " +
+      escapeHtml(u.role || "normal")
+    );
+  }
+
+  function paintReceipt(lines) {
+    const box = $("receipt-box");
+    if (!box) return;
+    box.className = "receipt-box";
+    box.textContent = Array.isArray(lines) ? lines.join("\n") : String(lines || "");
   }
 
   async function handleSessionReplaced() {
@@ -498,16 +484,26 @@
     return data;
   }
 
-  function initAccordions() {
-    document.querySelectorAll("[data-accordion]").forEach((panel) => {
-      const toggle = panel.querySelector(".accordion-toggle");
-      if (!toggle || toggle.dataset.bound) return;
-      toggle.dataset.bound = "1";
-      toggle.addEventListener("click", () => {
-        const open = panel.classList.toggle("is-open");
-        toggle.setAttribute("aria-expanded", open ? "true" : "false");
-      });
-    });
+  async function invokeAdminRental(body) {
+    const { data, error } = await sb.functions.invoke(EDGE_ADMIN_FN, { body });
+    if (error) {
+      let detail = error.message || "edge_invoke_failed";
+      try {
+        const ctx = error.context;
+        if (ctx && typeof ctx.json === "function") {
+          const errBody = await ctx.json();
+          if (errBody?.error) detail = errBody.error;
+          else if (errBody?.detail) detail = errBody.detail;
+          else if (errBody?.reason) detail = errBody.reason;
+        }
+      } catch (_) {}
+      if (data?.error) detail = data.error;
+      throw new Error(detail);
+    }
+    if (!data || data.ok === false) {
+      throw new Error(data?.error || data?.reason || "rental_failed");
+    }
+    return data;
   }
 
   async function requireAdminSession() {
@@ -536,12 +532,58 @@
     }
   }
 
-  function setChromeLoggedIn(on) {
-    $("logout-btn").classList.toggle("hidden", !on);
-    const chip = $("nav-admin");
-    if (chip) chip.classList.toggle("hidden", !on);
+  /* ---- Mode / View ---- */
+  function setMode(mode) {
+    adminMode = mode === "token" ? "token" : "day";
+    try {
+      localStorage.setItem(MODE_KEY, adminMode);
+    } catch (_) {}
+    dash?.classList.toggle("mode-day", adminMode === "day");
+    dash?.classList.toggle("mode-token", adminMode === "token");
+    $("mode-day")?.classList.toggle("is-active", adminMode === "day");
+    $("mode-token")?.classList.toggle("is-active", adminMode === "token");
+    const hint =
+      adminMode === "day" ? "โหมด: เติมวัน (PC)" : "โหมด: เติมโทเค็น (Web)";
+    if ($("overview-mode-hint")) $("overview-mode-hint").textContent = hint;
+    if ($("cashier-mode-hint")) {
+      $("cashier-mode-hint").textContent =
+        adminMode === "day" ? "เปิดสิทธิ์วันใช้งาน" : "เติมโทเค็นเว็บ";
+    }
+    renderUsers(cachedUsers);
+    paintKpis();
   }
 
+  function showView(name) {
+    currentView = name || "overview";
+    document.querySelectorAll(".pos-view").forEach((el) => {
+      el.classList.toggle("is-active", el.getAttribute("data-panel") === currentView);
+    });
+    document.querySelectorAll(".nav-item").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.getAttribute("data-view") === currentView);
+    });
+  }
+
+  function paintKpis() {
+    const total = cachedUsers.length;
+    let active = 0;
+    let expired = 0;
+    cachedUsers.forEach((u) => {
+      const st = rentalStatus(u);
+      if (st.kind === "active" || st.kind === "permanent") active += 1;
+      else if (st.kind === "expired" || st.kind === "unset") expired += 1;
+    });
+    if ($("kpi-users")) $("kpi-users").textContent = String(total);
+    if ($("kpi-active")) $("kpi-active").textContent = String(active);
+    if ($("kpi-expired")) $("kpi-expired").textContent = String(expired);
+    if ($("kpi-tokens")) {
+      $("kpi-tokens").textContent =
+        lastStats && lastStats.tokens_credited != null
+          ? "+" + String(lastStats.tokens_credited)
+          : "—";
+    }
+  }
+
+  /* ---- Data loaders ---- */
   async function loadStuckTopups() {
     const root = $("stuck-topups");
     if (!root) return;
@@ -564,23 +606,17 @@
             '<div class="admin-row" data-redemption-id="' +
             id +
             '">' +
-            '<div class="admin-row-head">' +
-            "<strong>" +
+            '<div class="admin-row-head"><strong>' +
             tokens +
             " โทเค็น · " +
             escapeHtml(baht) +
             "฿</strong>" +
-            '<button type="button" class="btn btn-candy" data-action="credit-retry">เครดิตซ้ำ</button>' +
-            "</div>" +
+            '<button type="button" class="btn btn-primary btn-sm" data-action="credit-retry">เครดิตซ้ำ</button></div>' +
             '<div class="muted">ผู้ใช้: ' +
             escapeHtml(row.user_id) +
             " · " +
             escapeHtml(formatDay(row.created_at)) +
-            "</div>" +
-            (row.error_note
-              ? '<div class="muted">' + escapeHtml(row.error_note) + "</div>"
-              : "") +
-            "</div>"
+            "</div></div>"
           );
         })
         .join("");
@@ -604,23 +640,17 @@
       root.className = "admin-list";
       root.innerHTML = items
         .map((row) => {
-          const meta = row.meta ? JSON.stringify(row.meta) : "";
           return (
-            '<div class="admin-row">' +
-            '<div class="admin-row-head"><strong>' +
+            '<div class="admin-row"><div class="admin-row-head"><strong>' +
             escapeHtml(row.action) +
-            "</strong><span class=\"muted\">" +
+            '</strong><span class="muted">' +
             escapeHtml(formatDay(row.created_at)) +
             "</span></div>" +
             '<div class="muted">ผู้ทำ: ' +
             escapeHtml(row.actor_id || "—") +
             " · เป้าหมาย: " +
             escapeHtml(row.target_user_id || "—") +
-            "</div>" +
-            (meta
-              ? '<div class="muted">' + escapeHtml(meta) + "</div>"
-              : "") +
-            "</div>"
+            "</div></div>"
           );
         })
         .join("");
@@ -636,28 +666,27 @@
     root.className = "stats-box muted";
     try {
       const data = await api("/api/admin/stats");
+      lastStats = data;
       const runs = data.runs || {};
       root.className = "stats-box";
       root.innerHTML =
         "<strong>วันที่ " +
         escapeHtml(data.date) +
-        "</strong><br>" +
-        "ฟาร์มทั้งหมด: " +
+        "</strong><br>ฟาร์ม: " +
         escapeHtml(data.runs_total || 0) +
         " (สำเร็จ " +
         escapeHtml(runs.succeeded || 0) +
         " · ล้ม " +
         escapeHtml(runs.failed || 0) +
-        ")<br>" +
-        "โทเค็นเติม: +" +
+        ")<br>โทเค็นเติม: +" +
         escapeHtml(data.tokens_credited || 0) +
         " · ใช้ไป: -" +
         escapeHtml(data.tokens_consumed || 0) +
-        "<br>" +
-        "เติมเงิน: " +
+        "<br>เติมเงิน: " +
         escapeHtml(data.topups || 0) +
-        " · ต้องตามมือ: " +
+        " · ตามมือ: " +
         escapeHtml(data.topups_needs_manual || 0);
+      paintKpis();
     } catch (e) {
       root.textContent = e.message || String(e);
     }
@@ -671,13 +700,150 @@
     } catch (_) {}
   }
 
+  function renderUsers(users) {
+    const thead = $("users-thead");
+    const body = $("users-body");
+    if (!thead || !body) return;
+
+    if (adminMode === "day") {
+      thead.innerHTML =
+        "<tr><th>ชื่อผู้ใช้</th><th>บทบาท</th><th>สถานะเช่า</th><th>รายละเอียด</th><th>การทำงาน</th></tr>";
+    } else {
+      thead.innerHTML =
+        "<tr><th>ชื่อผู้ใช้</th><th>บทบาท</th><th>โทเค็น</th><th>สถานะ</th><th>การทำงาน</th></tr>";
+    }
+
+    if (!users.length) {
+      body.innerHTML =
+        '<tr><td class="muted" colspan="5">ยังไม่มีผู้ใช้</td></tr>';
+      return;
+    }
+
+    body.innerHTML = users
+      .map((u) => {
+        const id = escapeHtml(u.id || "");
+        const name = escapeHtml(u.username || "—");
+        const unameAttr = escapeHtml(u.username || "");
+        const role = escapeHtml(u.role || "normal");
+        const isSelf = adminId && u.id === adminId;
+        const isAdmin = (u.role || "normal") === "admin";
+        const banned = !!u.banned_at;
+        const canMutate = !isSelf && !isAdmin;
+        const st = rentalStatus(u);
+        const bal = Number(u.token_balance ?? 0);
+
+        let midCols = "";
+        if (adminMode === "day") {
+          midCols =
+            '<td data-label="สถานะเช่า"><span class="tag tag-' +
+            st.kind +
+            '">' +
+            escapeHtml(st.label) +
+            '</span></td><td data-label="รายละเอียด" class="muted">' +
+            escapeHtml(st.detail) +
+            "</td>";
+        } else {
+          midCols =
+            '<td data-label="โทเค็น"><strong>' +
+            escapeHtml(bal) +
+            '</strong></td><td data-label="สถานะ"><span class="tag tag-' +
+            st.kind +
+            '">' +
+            escapeHtml(st.label) +
+            "</span></td>";
+        }
+
+        const actions = [];
+        if (adminMode === "day" && canMutate) {
+          actions.push(
+            '<button type="button" class="btn btn-primary btn-sm" data-action="quick-extend">ต่ออายุ</button>'
+          );
+          actions.push(
+            '<button type="button" class="btn btn-ghost btn-sm" data-action="make-permanent">ถาวร</button>'
+          );
+        }
+        if (adminMode === "token" && canMutate) {
+          actions.push(
+            '<button type="button" class="btn btn-primary btn-sm" data-action="credit-row">เติม</button>'
+          );
+          actions.push(
+            '<button type="button" class="btn btn-ghost btn-sm" data-action="set-tokens-row">ตั้งยอด</button>'
+          );
+        }
+        if (canMutate) {
+          if (banned) {
+            actions.push(
+              '<button type="button" class="btn btn-ghost btn-sm" data-action="unban-user">ปลดแบน</button>'
+            );
+          } else {
+            actions.push(
+              '<button type="button" class="btn btn-ghost btn-sm" data-action="ban-user">แบน</button>'
+            );
+          }
+          actions.push(
+            '<button type="button" class="btn btn-danger btn-sm" data-action="delete-user">ลบ</button>'
+          );
+        } else if (isSelf) {
+          actions.push('<span class="muted">คุณ</span>');
+        }
+
+        return (
+          '<tr data-user-id="' +
+          id +
+          '" data-username="' +
+          unameAttr +
+          '" data-tokens="' +
+          escapeHtml(bal) +
+          '"><td data-label="ชื่อผู้ใช้"><strong class="user-name">' +
+          name +
+          '</strong></td><td data-label="บทบาท"><span class="tag tag-role">' +
+          role +
+          "</span></td>" +
+          midCols +
+          '<td data-label="การทำงาน"><div class="row-actions">' +
+          actions.join("") +
+          "</div></td></tr>"
+        );
+      })
+      .join("");
+  }
+
+  async function loadUsers() {
+    const listStatus = $("list-status");
+    const body = $("users-body");
+    if (body) {
+      body.innerHTML =
+        '<tr><td class="muted" colspan="5">กำลังโหลด…</td></tr>';
+    }
+    try {
+      let users = null;
+      try {
+        const { data, error } = await sb.rpc("admin_list_profiles");
+        if (!error && Array.isArray(data)) users = data;
+      } catch (_) {}
+      if (!users) {
+        const data = await api("/api/admin/users");
+        users = data.users || [];
+      }
+      cachedUsers = users;
+      renderUsers(users);
+      paintKpis();
+      setStatus(listStatus, "", "muted");
+    } catch (e) {
+      if (body) body.innerHTML = "";
+      setStatus(listStatus, e.message, "err");
+    }
+  }
+
   async function showDash(profile) {
     loginPanel.classList.add("hidden");
     dash.classList.remove("hidden");
-    setChromeLoggedIn(true);
     adminId = profile.id || null;
-    $("who-user").textContent = profile.username || profile.display_name || "admin";
-    initAccordions();
+    const whoName = profile.username || profile.display_name || "admin";
+    if ($("who-user")) $("who-user").textContent = whoName;
+    if ($("who-user-mobile")) $("who-user-mobile").textContent = whoName;
+    setMode(adminMode);
+    showView("overview");
     await Promise.all([
       loadUsers(),
       loadStuckTopups(),
@@ -690,125 +856,21 @@
   function showLogin() {
     dash.classList.add("hidden");
     loginPanel.classList.remove("hidden");
-    setChromeLoggedIn(false);
     adminId = null;
+    cachedUsers = [];
   }
 
-  function renderUsers(users) {
-    const body = $("users-body");
-    if (!users.length) {
-      body.innerHTML = '<p class="muted user-items-empty">ยังไม่มีผู้ใช้</p>';
-      return;
-    }
-    body.innerHTML = users
-      .map((u) => {
-        const id = escapeHtml(u.id || "");
-        const name = escapeHtml(u.username || "—");
-        const role = escapeHtml(u.role || "normal");
-        const bal = Number(u.token_balance ?? 0);
-        const isSelf = adminId && u.id === adminId;
-        const isAdmin = role === "admin";
-        const banned = !!u.banned_at;
-        const canDelete = !isSelf && !isAdmin;
-        const canBan = !isSelf && !isAdmin;
-        return (
-          '<article class="user-item" data-user-id="' +
-          id +
-          '">' +
-          '<div class="user-item-head">' +
-          '<span class="user-name" title="' +
-          name +
-          '">' +
-          name +
-          "</span>" +
-          '<span class="role ' +
-          role +
-          '">' +
-          role +
-          "</span>" +
-          (banned ? '<span class="banned-tag">ถูกแบน</span>' : "") +
-          "</div>" +
-          '<div class="user-item-ctrl">' +
-          '<div class="token-group">' +
-          '<img src="assets/coin.png" alt="" width="18" height="18" />' +
-          '<input class="token-input" type="number" min="0" max="1000000" value="' +
-          bal +
-          '" data-orig="' +
-          bal +
-          '" aria-label="โทเค็น ' +
-          name +
-          '" />' +
-          '<button type="button" class="btn btn-ghost btn-sm" data-action="save-tokens">บันทึก</button>' +
-          "</div>" +
-          (canBan
-            ? banned
-              ? '<button type="button" class="btn btn-ghost btn-sm" data-action="unban-user">ปลดแบน</button>'
-              : '<button type="button" class="btn btn-ghost btn-sm" data-action="ban-user">แบน</button>'
-            : "") +
-          (canDelete
-            ? '<button type="button" class="btn btn-danger btn-sm" data-action="delete-user">ลบ</button>'
-            : '<span class="muted tiny">' + (isSelf ? "คุณ" : "") + "</span>") +
-          "</div>" +
-          "</article>"
-        );
-      })
-      .join("");
-  }
-
-  async function loadUsers() {
-    const listStatus = $("list-status");
-    const body = $("users-body");
-    body.innerHTML = '<p class="muted user-items-empty">กำลังโหลด…</p>';
-    try {
-      const data = await api("/api/admin/users");
-      renderUsers(data.users || []);
-      setStatus(listStatus, "", "muted");
-    } catch (e) {
-      body.innerHTML = "";
-      setStatus(listStatus, e.message, "err");
-    }
-  }
-
-  async function saveTokens(item) {
-    const userId = item.getAttribute("data-user-id");
-    const input = item.querySelector(".token-input");
-    const btn = item.querySelector('[data-action="save-tokens"]');
-    const listStatus = $("list-status");
-    const next = Math.max(0, Math.min(1_000_000, Number(input.value) || 0));
-    const orig = Number(input.getAttribute("data-orig") || 0);
-    if (next === orig) {
-      setStatus(listStatus, "ไม่มีการเปลี่ยนแปลง", "muted");
-      return;
-    }
-    btn.disabled = true;
-    setStatus(listStatus, "กำลังบันทึกโทเค็น…", "muted");
-    try {
-      const data = await api("/api/admin/set-tokens", {
-        method: "POST",
-        body: { user_id: userId, token_balance: next, reason: "admin_set" },
-      });
-      input.value = String(data.token_balance ?? next);
-      input.setAttribute("data-orig", String(data.token_balance ?? next));
-      setStatus(listStatus, "อัปเดตโทเค็นแล้ว: " + (data.token_balance ?? next), "ok");
-      loadAudit().catch(() => {});
-    } catch (err) {
-      setStatus(listStatus, err.message || String(err), "err");
-    } finally {
-      btn.disabled = false;
-    }
-  }
-
-  async function deleteUser(item) {
-    const userId = item.getAttribute("data-user-id");
-    const name = item.querySelector(".user-name")?.textContent || userId;
+  /* ---- User actions ---- */
+  async function deleteUser(row) {
+    const userId = row.getAttribute("data-user-id");
+    const name = row.querySelector(".user-name")?.textContent || userId;
     const listStatus = $("list-status");
     const confirmed = await showConfirmModal({
       title: "ลบผู้ใช้?",
-      body: 'ลบผู้ใช้ "' + name + '" ถาวร?\nบัญชี Auth + โปรไฟล์จะถูกลบ',
+      body: 'ลบผู้ใช้ "' + name + '" ถาวร?',
       confirmLabel: "ลบถาวร",
       cancelLabel: "ยกเลิก",
       danger: true,
-      icon: "assets/notice_b19.png",
     });
     if (!confirmed) return;
     setStatus(listStatus, "กำลังลบ…", "muted");
@@ -823,25 +885,24 @@
     }
   }
 
-  async function banUser(item) {
-    const userId = item.getAttribute("data-user-id");
-    const name = item.querySelector(".user-name")?.textContent || userId;
+  async function banUser(row) {
+    const userId = row.getAttribute("data-user-id");
+    const name = row.querySelector(".user-name")?.textContent || userId;
     const listStatus = $("list-status");
     const reasonRaw = await showPromptModal({
       title: "แบนผู้ใช้",
       body: 'เหตุผลแบน "' + name + '" (ว่างได้)',
-      placeholder: "เหตุผล (ไม่บังคับ)",
+      placeholder: "เหตุผล",
       defaultValue: "",
       confirmLabel: "แบน",
       cancelLabel: "ยกเลิก",
     });
     if (reasonRaw === null) return;
-    const reason = String(reasonRaw).trim();
     setStatus(listStatus, "กำลังแบน…", "muted");
     try {
       await api("/api/admin/users/" + encodeURIComponent(userId) + "/ban", {
         method: "POST",
-        body: { reason },
+        body: { reason: String(reasonRaw).trim() },
       });
       setStatus(listStatus, "แบนแล้ว: " + name, "ok");
       await Promise.all([loadUsers(), loadAudit()]);
@@ -850,9 +911,9 @@
     }
   }
 
-  async function unbanUser(item) {
-    const userId = item.getAttribute("data-user-id");
-    const name = item.querySelector(".user-name")?.textContent || userId;
+  async function unbanUser(row) {
+    const userId = row.getAttribute("data-user-id");
+    const name = row.querySelector(".user-name")?.textContent || userId;
     const listStatus = $("list-status");
     setStatus(listStatus, "กำลังปลดแบน…", "muted");
     try {
@@ -867,29 +928,157 @@
     }
   }
 
-  $("users-body").addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-action]");
-    if (!btn) return;
-    const item = btn.closest("[data-user-id]");
-    if (!item) return;
-    const action = btn.getAttribute("data-action");
-    if (action === "save-tokens") saveTokens(item);
-    if (action === "delete-user") deleteUser(item);
-    if (action === "ban-user") banUser(item);
-    if (action === "unban-user") unbanUser(item);
+  async function quickExtendUser(row) {
+    const username = row.getAttribute("data-username") || "";
+    const name = row.querySelector(".user-name")?.textContent || username;
+    const listStatus = $("list-status");
+    if (!username) return;
+    const daysRaw = await showPromptModal({
+      title: "ต่ออายุ",
+      body: 'เพิ่มกี่วันให้ "' + name + '"?',
+      placeholder: "จำนวนวัน",
+      defaultValue: "1",
+      confirmLabel: "ต่ออายุ",
+      cancelLabel: "ยกเลิก",
+      icon: "assets/score.png",
+    });
+    if (daysRaw === null) return;
+    const days = Math.max(0, Math.floor(Number(daysRaw) || 0));
+    if (days < 1) {
+      setStatus(listStatus, "ต้องระบุอย่างน้อย 1 วัน", "err");
+      return;
+    }
+    setStatus(listStatus, "กำลังต่ออายุ…", "muted");
+    try {
+      const data = await invokeAdminRental({
+        action: "extend",
+        username,
+        days,
+        hours: 0,
+        minutes: 0,
+      });
+      setStatus(
+        listStatus,
+        "ต่ออายุแล้ว · หมด " + formatDay(data.user?.expires_at),
+        "ok"
+      );
+      paintReceipt([
+        "ต่ออายุ",
+        "User: " + (data.user?.username || username),
+        "หมดอายุ: " + formatDay(data.user?.expires_at),
+      ]);
+      await loadUsers();
+    } catch (err) {
+      setStatus(listStatus, err.message || String(err), "err");
+    }
+  }
+
+  async function makePermanentUser(row) {
+    const username = row.getAttribute("data-username") || "";
+    const name = row.querySelector(".user-name")?.textContent || username;
+    const listStatus = $("list-status");
+    if (!username) return;
+    const confirmed = await showConfirmModal({
+      title: "ตั้งถาวร?",
+      body: 'ตั้ง "' + name + '" เป็นบัญชีถาวร?',
+      confirmLabel: "ตั้งถาวร",
+      cancelLabel: "ยกเลิก",
+      icon: "assets/score.png",
+    });
+    if (!confirmed) return;
+    try {
+      await invokeAdminRental({
+        action: "make_permanent",
+        username,
+        permanent: true,
+      });
+      setStatus(listStatus, "ตั้งถาวรแล้ว: " + name, "ok");
+      paintReceipt(["ตั้งถาวร", "User: " + name, "สถานะ: ถาวร"]);
+      await loadUsers();
+    } catch (err) {
+      setStatus(listStatus, err.message || String(err), "err");
+    }
+  }
+
+  async function creditRow(row) {
+    const username = row.getAttribute("data-username") || "";
+    if (!username) return;
+    showView("cashier");
+    setMode("token");
+    if ($("credit-q")) $("credit-q").value = username;
+    if ($("lookup-q")) $("lookup-q").value = username;
+    $("lookup-form")?.requestSubmit();
+  }
+
+  async function setTokensRow(row) {
+    const userId = row.getAttribute("data-user-id");
+    const name = row.querySelector(".user-name")?.textContent || userId;
+    const orig = Number(row.getAttribute("data-tokens") || 0);
+    const listStatus = $("list-status");
+    const nextRaw = await showPromptModal({
+      title: "ตั้งยอดโทเค็น",
+      body: 'ยอดใหม่ของ "' + name + '" (เดิม ' + orig + ")",
+      placeholder: "จำนวนโทเค็น",
+      defaultValue: String(orig),
+      confirmLabel: "บันทึก",
+      cancelLabel: "ยกเลิก",
+      icon: "assets/coin.png",
+    });
+    if (nextRaw === null) return;
+    const next = Math.max(0, Math.min(1_000_000, Number(nextRaw) || 0));
+    setStatus(listStatus, "กำลังบันทึก…", "muted");
+    try {
+      const data = await api("/api/admin/set-tokens", {
+        method: "POST",
+        body: { user_id: userId, token_balance: next, reason: "admin_set" },
+      });
+      setStatus(listStatus, "ยอดใหม่: " + (data.token_balance ?? next), "ok");
+      paintReceipt([
+        "ตั้งยอดโทเค็น",
+        "User: " + name,
+        "ยอด: " + (data.token_balance ?? next),
+      ]);
+      await Promise.all([loadUsers(), loadAudit()]);
+    } catch (err) {
+      setStatus(listStatus, err.message || String(err), "err");
+    }
+  }
+
+  /* ---- Events ---- */
+  document.querySelectorAll(".nav-item").forEach((btn) => {
+    btn.addEventListener("click", () => showView(btn.getAttribute("data-view")));
   });
 
-  $("login-form").addEventListener("submit", async (e) => {
+  $("mode-day")?.addEventListener("click", () => setMode("day"));
+  $("mode-token")?.addEventListener("click", () => setMode("token"));
+
+  $("users-body")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-action]");
+    if (!btn) return;
+    const row = btn.closest("[data-user-id]");
+    if (!row) return;
+    const action = btn.getAttribute("data-action");
+    if (action === "delete-user") deleteUser(row);
+    if (action === "ban-user") banUser(row);
+    if (action === "unban-user") unbanUser(row);
+    if (action === "quick-extend") quickExtendUser(row);
+    if (action === "make-permanent") makePermanentUser(row);
+    if (action === "credit-row") creditRow(row);
+    if (action === "set-tokens-row") setTokensRow(row);
+  });
+
+  $("login-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const username = $("login-user").value.trim();
-    const password = $("login-pass").value;
     $("login-btn").disabled = true;
     setStatus($("login-status"), "กำลังเข้าสู่ระบบ…", "muted");
     try {
       await ensureApiReady();
       const data = await api("/api/auth/login", {
         method: "POST",
-        body: { username, password },
+        body: {
+          username: $("login-user").value.trim(),
+          password: $("login-pass").value,
+        },
       });
       if (!data.access_token || !data.refresh_token) {
         throw new Error("login_no_session");
@@ -914,12 +1103,7 @@
     }
   });
 
-  async function ensureApiReady() {
-    if (apiReady) return true;
-    return pingApiHealth(2);
-  }
-
-  $("logout-btn").addEventListener("click", async () => {
+  $("logout-btn")?.addEventListener("click", async () => {
     await sb.auth.signOut();
     accessToken = null;
     persistSessionToken(null);
@@ -927,25 +1111,14 @@
     setStatus($("login-status"), "ออกจากระบบแล้ว", "muted");
   });
 
-  $("refresh-btn").addEventListener("click", (e) => {
-    e.stopPropagation();
-    loadUsers();
+  $("logout-btn-mobile")?.addEventListener("click", () => {
+    $("logout-btn")?.click();
   });
 
-  $("refresh-stuck-btn")?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    loadStuckTopups();
-  });
-
-  $("refresh-audit-btn")?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    loadAudit();
-  });
-
-  $("refresh-stats-btn")?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    loadStats();
-  });
+  $("refresh-btn")?.addEventListener("click", () => loadUsers());
+  $("refresh-stuck-btn")?.addEventListener("click", () => loadStuckTopups());
+  $("refresh-audit-btn")?.addEventListener("click", () => loadAudit());
+  $("refresh-stats-btn")?.addEventListener("click", () => loadStats());
 
   $("save-settings-btn")?.addEventListener("click", async () => {
     setStatus($("settings-status"), "กำลังบันทึก…", "muted");
@@ -957,7 +1130,7 @@
           topup_maintenance: !!$("set-topup-maint")?.checked,
         },
       });
-      setStatus($("settings-status"), "บันทึกสถานะแล้ว", "ok");
+      setStatus($("settings-status"), "บันทึกแล้ว", "ok");
       await Promise.all([loadSettings(), loadAudit()]);
     } catch (err) {
       setStatus($("settings-status"), err.message || String(err), "err");
@@ -996,27 +1169,70 @@
     }
   });
 
-  $("create-form").addEventListener("submit", async (e) => {
+  $("create-permanent")?.addEventListener("change", () =>
+    syncDurationVisibility("create")
+  );
+  $("extend-permanent")?.addEventListener("change", () =>
+    syncDurationVisibility("extend")
+  );
+  syncDurationVisibility("create");
+  syncDurationVisibility("extend");
+
+  document.querySelectorAll(".pack-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const days = Math.max(0, Number(btn.getAttribute("data-pack-days")) || 0);
+      const target = btn.getAttribute("data-pack-target") || "create";
+      const permanentEl = $(target + "-permanent");
+      if (permanentEl) {
+        permanentEl.checked = false;
+        syncDurationVisibility(target);
+      }
+      if ($(target + "-days")) $(target + "-days").value = String(days);
+      if ($(target + "-hours")) $(target + "-hours").value = "0";
+      if ($(target + "-minutes")) $(target + "-minutes").value = "0";
+    });
+  });
+
+  $("create-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     $("create-btn").disabled = true;
     setStatus($("create-status"), "กำลังสร้าง…", "muted");
     try {
-      const data = await api("/api/admin/create-user", {
-        method: "POST",
-        body: {
-          username: $("create-user").value.trim(),
-          password: $("create-pass").value,
-          initial_tokens: Number($("create-tokens").value) || 0,
-        },
+      const username = $("create-user").value.trim();
+      const password = $("create-pass").value;
+      const permanent = !!$("create-permanent")?.checked;
+      const duration = readDuration("create");
+      if (!permanent && !hasDuration(duration)) {
+        throw new Error("ระบุวัน / ชม. / นาที หรือเลือกถาวร");
+      }
+      const data = await invokeAdminRental({
+        action: "create",
+        username,
+        password,
+        permanent,
+        days: duration.days,
+        hours: duration.hours,
+        minutes: duration.minutes,
       });
+      const u = data.user || {};
+      const st = rentalStatus(u);
       setStatus(
         $("create-status"),
-        "สร้างแล้ว: " + data.username + " · " + data.token_balance + " โทเค็น",
+        "สร้างแล้ว: " + (u.username || username) + " · " + st.label,
         "ok"
       );
+      paintReceipt([
+        "สร้างผู้ใช้",
+        "User: " + (u.username || username),
+        "สถานะ: " + st.label,
+        u.expires_at ? "หมดอายุ: " + formatDay(u.expires_at) : "ถาวร",
+      ]);
       $("create-form").reset();
-      $("create-tokens").value = "0";
-      await Promise.all([loadUsers(), loadAudit()]);
+      if ($("create-days")) $("create-days").value = "1";
+      if ($("create-hours")) $("create-hours").value = "0";
+      if ($("create-minutes")) $("create-minutes").value = "0";
+      syncDurationVisibility("create");
+      await loadUsers();
     } catch (err) {
       setStatus($("create-status"), err.message || String(err), "err");
     } finally {
@@ -1024,7 +1240,113 @@
     }
   });
 
-  $("lookup-form").addEventListener("submit", async (e) => {
+  $("extend-lookup-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const q = $("extend-q").value.trim();
+    const box = $("extend-result");
+    if (box) {
+      box.textContent = "กำลังค้นหา…";
+      box.className = "lookup-box muted";
+    }
+    try {
+      let row = null;
+      const { data, error } = await sb.rpc("admin_lookup_user", { p_query: q });
+      if (!error && data?.ok) row = data;
+      if (!row) {
+        const legacy = await api("/api/admin/lookup?q=" + encodeURIComponent(q));
+        if (legacy?.ok) row = legacy;
+        else throw new Error(legacy?.reason || "ไม่พบผู้ใช้");
+      }
+      if (box) {
+        box.className = "lookup-box";
+        box.innerHTML = describeRentalUser(row);
+      }
+      if ($("extend-q")) $("extend-q").value = row.username || q;
+    } catch (err) {
+      if (box) box.textContent = err.message || String(err);
+    }
+  });
+
+  $("extend-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("extend-btn").disabled = true;
+    setStatus($("extend-status"), "กำลังต่ออายุ…", "muted");
+    try {
+      const username = $("extend-q").value.trim();
+      if (!username) throw new Error("ใส่ชื่อผู้ใช้ก่อน");
+      const permanent = !!$("extend-permanent")?.checked;
+      const duration = readDuration("extend");
+      if (!permanent && !hasDuration(duration)) {
+        throw new Error("ระบุวัน / ชม. / นาที หรือตั้งถาวร");
+      }
+      const data = await invokeAdminRental(
+        permanent
+          ? { action: "make_permanent", username, permanent: true }
+          : {
+              action: "extend",
+              username,
+              days: duration.days,
+              hours: duration.hours,
+              minutes: duration.minutes,
+            }
+      );
+      const u = data.user || {};
+      const st = rentalStatus(u);
+      setStatus(
+        $("extend-status"),
+        (permanent ? "ตั้งถาวรแล้ว: " : "ต่ออายุแล้ว: ") +
+          (u.username || username) +
+          " · " +
+          st.label,
+        "ok"
+      );
+      paintReceipt([
+        permanent ? "ตั้งถาวร" : "ต่ออายุ",
+        "User: " + (u.username || username),
+        "สถานะ: " + st.label,
+        u.expires_at ? "หมดอายุ: " + formatDay(u.expires_at) : "ถาวร",
+      ]);
+      if ($("extend-result")) {
+        $("extend-result").className = "lookup-box";
+        $("extend-result").innerHTML = describeRentalUser(u);
+      }
+      await loadUsers();
+    } catch (err) {
+      setStatus($("extend-status"), err.message || String(err), "err");
+    } finally {
+      $("extend-btn").disabled = false;
+    }
+  });
+
+  $("revoke-btn")?.addEventListener("click", async () => {
+    const username = $("extend-q").value.trim();
+    if (!username) {
+      setStatus($("extend-status"), "ใส่ชื่อผู้ใช้ก่อน", "err");
+      return;
+    }
+    const confirmed = await showConfirmModal({
+      title: "ตัดสิทธิ์ทันที?",
+      body: 'ตัดสิทธิ์ "' + username + '" ทันที?',
+      confirmLabel: "ตัดสิทธิ์",
+      cancelLabel: "ยกเลิก",
+      danger: true,
+    });
+    if (!confirmed) return;
+    $("revoke-btn").disabled = true;
+    try {
+      const data = await invokeAdminRental({ action: "revoke", username });
+      const u = data.user || { username };
+      setStatus($("extend-status"), "ตัดสิทธิ์แล้ว: " + (u.username || username), "ok");
+      paintReceipt(["ตัดสิทธิ์", "User: " + (u.username || username)]);
+      await loadUsers();
+    } catch (err) {
+      setStatus($("extend-status"), err.message || String(err), "err");
+    } finally {
+      $("revoke-btn").disabled = false;
+    }
+  });
+
+  $("lookup-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const q = $("lookup-q").value.trim();
     $("lookup-result").textContent = "กำลังค้นหา…";
@@ -1034,74 +1356,59 @@
         $("lookup-result").textContent = data.reason || "ไม่พบผู้ใช้";
         return;
       }
-      let topupHtml = "";
-      if (data.id) {
-        try {
-          const top = await api(
-            "/api/admin/users/" + encodeURIComponent(data.id) + "/topups"
-          );
-          const items = top.items || [];
-          if (items.length) {
-            topupHtml =
-              '<div class="lookup-topups"><strong>เติมล่าสุด</strong><ul>' +
-              items
-                .map((row) => {
-                  const st =
-                    row.credit_status === "needs_manual" ? "ต้องตามมือ" : "สำเร็จ";
-                  return (
-                    "<li>" +
-                    escapeHtml(formatDay(row.created_at)) +
-                    " · " +
-                    escapeHtml(row.tokens_credited || row.package_tokens) +
-                    "โทเค็น · " +
-                    escapeHtml(row.amount_baht) +
-                    "฿ · " +
-                    st +
-                    "</li>"
-                  );
-                })
-                .join("") +
-              "</ul></div>";
-          }
-        } catch (_) {}
-      }
       $("lookup-result").innerHTML =
         "<strong>" +
         escapeHtml(data.username || q) +
         "</strong> · โทเค็น: " +
         escapeHtml(data.token_balance) +
         " · บทบาท: " +
-        escapeHtml(data.role) +
-        topupHtml;
+        escapeHtml(data.role);
       $("credit-q").value = data.username || q;
     } catch (err) {
       $("lookup-result").textContent = err.message;
     }
   });
 
-  $("credit-form").addEventListener("submit", async (e) => {
+  $("credit-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     setStatus($("credit-status"), "กำลังเติมโทเค็น…", "muted");
     try {
+      const q = $("credit-q").value.trim();
+      const amt = Number($("credit-amt").value) || 0;
       const data = await api("/api/admin/add-tokens", {
         method: "POST",
-        body: {
-          query: $("credit-q").value.trim(),
-          amount: Number($("credit-amt").value) || 0,
-          reason: "admin_credit",
-        },
+        body: { query: q, amount: amt, reason: "admin_credit" },
       });
       setStatus($("credit-status"), "ยอดใหม่: " + data.token_balance, "ok");
-      await Promise.all([loadUsers(), loadAudit()]);
+      paintReceipt([
+        "เติมโทเค็น",
+        "User: " + q,
+        "เพิ่ม: +" + amt,
+        "ยอดใหม่: " + data.token_balance,
+      ]);
+      await Promise.all([loadUsers(), loadAudit(), loadStats()]);
     } catch (err) {
       setStatus($("credit-status"), err.message, "err");
     }
   });
 
-  initBgFloaters();
-  initAccordions();
+  $("quick-search-form")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = $("quick-search").value.trim();
+    if (!q) return;
+    showView("cashier");
+    if (adminMode === "day") {
+      if ($("extend-q")) $("extend-q").value = q;
+      $("extend-lookup-form")?.requestSubmit();
+    } else {
+      if ($("lookup-q")) $("lookup-q").value = q;
+      $("lookup-form")?.requestSubmit();
+    }
+  });
+
   sessionToken = loadStoredSessionToken();
   pingApiHealth(2).catch(() => {});
+  initBgFloaters();
 
   (async () => {
     const ctx = await requireAdminSession();

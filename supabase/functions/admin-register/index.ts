@@ -1,6 +1,13 @@
-// Admin-only customer registration for PartyRun rental accounts.
-// Uses service role to create Auth users. Never expose service_role to the browser.
+// Admin day-rental: create / extend / revoke / make_permanent.
+// Uses service role for Auth + profiles. Never expose service_role to the browser.
 // verify_jwt=true — caller must send Authorization: Bearer <admin access_token>
+//
+// Body:
+//   action?: "create" | "extend" | "revoke" | "make_permanent"  (default create)
+//   username?: string   (preferred for WWDC)
+//   email?: string      (legacy; or derived from username)
+//   password?: string   (create only)
+//   days?, hours?, minutes?, seconds?, permanent?
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -12,11 +19,80 @@ const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const SYNTHETIC_EMAIL_DOMAIN = "users.ckr.local";
+
+type Action = "create" | "extend" | "revoke" | "make_permanent";
+
+type Body = {
+  action?: string;
+  email?: string;
+  username?: string;
+  password?: string;
+  days?: number;
+  hours?: number;
+  minutes?: number;
+  seconds?: number;
+  permanent?: boolean;
+  role?: string;
+};
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function sanitizeUsername(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[._-]+|[._-]+$/g, "")
+    .slice(0, 64);
+}
+
+function syntheticEmail(username: string): string {
+  const sanitized = sanitizeUsername(username);
+  return `${sanitized}@${SYNTHETIC_EMAIL_DOMAIN}`;
+}
+
+function parseDuration(body: Body) {
+  const days = Math.max(0, Math.floor(Number(body.days) || 0));
+  const hours = Math.max(0, Math.floor(Number(body.hours) || 0));
+  const minutes = Math.max(0, Math.floor(Number(body.minutes) || 0));
+  const seconds = Math.max(0, Math.floor(Number(body.seconds) || 0));
+  return { days, hours, minutes, seconds };
+}
+
+function durationMs(d: {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+}): number {
+  return (
+    ((d.days * 86400) + (d.hours * 3600) + (d.minutes * 60) + d.seconds) *
+    1000
+  );
+}
+
+function hasDuration(d: {
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+}): boolean {
+  return d.days > 0 || d.hours > 0 || d.minutes > 0 || d.seconds > 0;
+}
+
+function parseAction(raw: string | undefined): Action {
+  const a = String(raw || "create").trim().toLowerCase();
+  if (a === "extend" || a === "renew") return "extend";
+  if (a === "revoke" || a === "expire") return "revoke";
+  if (a === "make_permanent" || a === "permanent") return "make_permanent";
+  return "create";
 }
 
 Deno.serve(async (req: Request) => {
@@ -39,7 +115,6 @@ Deno.serve(async (req: Request) => {
     return json({ ok: false, error: "missing_authorization" }, 401);
   }
 
-  // Validate caller JWT as the admin user
   const userClient = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
   });
@@ -65,37 +140,99 @@ Deno.serve(async (req: Request) => {
     return json({ ok: false, error: "admin_only" }, 403);
   }
 
-  let body: {
-    email?: string;
-    password?: string;
-    hours?: number;
-    minutes?: number;
-    seconds?: number;
-    permanent?: boolean;
-    role?: string;
-  };
+  let body: Body;
   try {
     body = await req.json();
   } catch {
     return json({ ok: false, error: "invalid_json" }, 400);
   }
 
-  const email = String(body.email || "").trim().toLowerCase();
-  const password = String(body.password || "");
+  const action = parseAction(body.action);
+  const usernameRaw = String(body.username || "").trim();
+  const emailRaw = String(body.email || "").trim().toLowerCase();
   const permanent = Boolean(body.permanent);
-  const hours = Math.max(0, Number(body.hours) || 0);
-  const minutes = Math.max(0, Number(body.minutes) || 0);
-  const seconds = Math.max(0, Number(body.seconds) || 0);
+  const duration = parseDuration(body);
   const role = body.role === "admin" ? "admin" : "normal";
 
-  if (!email || !email.includes("@")) {
-    return json({ ok: false, error: "invalid_email" }, 400);
+  // ---------- EXTEND / REVOKE / MAKE_PERMANENT ----------
+  if (action !== "create") {
+    const query = usernameRaw || emailRaw;
+    if (!query || query.length < 2) {
+      return json({ ok: false, error: "username_required" }, 400);
+    }
+
+    const { data: rpcData, error: rpcErr } = await adminClient.rpc(
+      "admin_extend_rental",
+      {
+        p_username: query,
+        p_days: duration.days,
+        p_hours: duration.hours,
+        p_minutes: duration.minutes,
+        p_seconds: duration.seconds,
+        p_permanent: action === "make_permanent" || permanent,
+        p_revoke: action === "revoke",
+      },
+    );
+
+    if (rpcErr) {
+      return json(
+        { ok: false, error: "extend_failed", detail: rpcErr.message },
+        500,
+      );
+    }
+
+    const result = rpcData as Record<string, unknown> | null;
+    if (!result || result.ok !== true) {
+      const reason = String(result?.reason || "extend_failed");
+      const status = reason === "user_not_found" ? 404 : 400;
+      return json({ ok: false, error: reason }, status);
+    }
+
+    return json({
+      ok: true,
+      action: result.action || action,
+      user: {
+        id: result.id,
+        username: result.username,
+        is_permanent: result.is_permanent,
+        expires_at: result.expires_at ?? null,
+      },
+    });
   }
+
+  // ---------- CREATE ----------
+  const username = usernameRaw;
+  let email = emailRaw;
+
+  if (username) {
+    if (username.length < 2) {
+      return json({ ok: false, error: "username_too_short" }, 400);
+    }
+    if (!/^[a-zA-Z0-9._-]{2,64}$/.test(username)) {
+      return json({ ok: false, error: "invalid_username" }, 400);
+    }
+    email = syntheticEmail(username);
+  }
+
+  if (!email || !email.includes("@")) {
+    return json({ ok: false, error: "invalid_email_or_username" }, 400);
+  }
+
+  const password = String(body.password || "");
   if (password.length < 6) {
     return json({ ok: false, error: "password_too_short" }, 400);
   }
-  if (!permanent && hours === 0 && minutes === 0 && seconds === 0) {
+  if (!permanent && !hasDuration(duration)) {
     return json({ ok: false, error: "rental_duration_required" }, 400);
+  }
+
+  if (username) {
+    const { data: existingLookup } = await adminClient.rpc("admin_lookup_user", {
+      p_query: username,
+    });
+    if (existingLookup && (existingLookup as { ok?: boolean }).ok === true) {
+      return json({ ok: false, error: "username_taken" }, 409);
+    }
   }
 
   const { data: created, error: createErr } =
@@ -103,6 +240,9 @@ Deno.serve(async (req: Request) => {
       email,
       password,
       email_confirm: true,
+      user_metadata: username
+        ? { username, display_name: username }
+        : undefined,
     });
 
   if (createErr || !created?.user) {
@@ -119,23 +259,26 @@ Deno.serve(async (req: Request) => {
   const userId = created.user.id;
   let expiresAt: string | null = null;
   if (!permanent) {
-    const ms =
-      ((hours * 3600) + (minutes * 60) + seconds) * 1000;
-    expiresAt = new Date(Date.now() + ms).toISOString();
+    expiresAt = new Date(Date.now() + durationMs(duration)).toISOString();
+  }
+
+  const patch: Record<string, unknown> = {
+    role,
+    is_permanent: permanent,
+    expires_at: expiresAt,
+    email,
+  };
+  if (username) {
+    patch.username = username;
+    patch.display_name = username;
   }
 
   const { error: updErr } = await adminClient
     .from("profiles")
-    .update({
-      role,
-      is_permanent: permanent,
-      expires_at: expiresAt,
-      email,
-    })
+    .update(patch)
     .eq("id", userId);
 
   if (updErr) {
-    // Roll back auth user if profile patch fails
     await adminClient.auth.admin.deleteUser(userId);
     return json(
       { ok: false, error: "profile_update_failed", detail: updErr.message },
@@ -145,9 +288,11 @@ Deno.serve(async (req: Request) => {
 
   return json({
     ok: true,
+    action: "create",
     user: {
       id: userId,
       email,
+      username: username || null,
       role,
       is_permanent: permanent,
       expires_at: expiresAt,
