@@ -18,101 +18,11 @@
 
   const $ = (id) => document.getElementById(id);
 
-  /* Floating bg deco — assets_web/bg (parent folder) */
-  const BG_FLOAT_BASE = "assets_web/bg/";
-  const BG_FLOAT_COUNT = 70;
-  const BG_EDGE_ZONES = [
-    { top: [4, 22], left: [2, 18] },
-    { top: [4, 22], left: [78, 94] },
-    { top: [28, 48], left: [1, 12] },
-    { top: [28, 48], left: [86, 96] },
-    { top: [52, 72], left: [2, 16] },
-    { top: [52, 72], left: [82, 95] },
-    { top: [74, 90], left: [8, 28] },
-    { top: [74, 90], left: [70, 90] },
-    { top: [8, 18], left: [36, 62] },
-  ];
-
-  function bgFloatCountForWidth(w) {
-    if (w < 480) return 3;
-    if (w < 768) return 5;
-    if (w < 1100) return 7;
-    return 9;
-  }
-
-  function bgFloatSizeRange(w) {
-    if (w < 480) return [32, 48];
-    if (w < 768) return [36, 54];
-    return [40, 64];
-  }
-
-  function shuffleInPlace(arr) {
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const t = arr[i];
-      arr[i] = arr[j];
-      arr[j] = t;
-    }
-    return arr;
-  }
-
-  function randBetween(min, max) {
-    return min + Math.random() * (max - min);
-  }
-
-  function initBgFloaters() {
-    const root = $("bg-floaters");
-    if (!root) return;
-
-    let lastCount = -1;
-    let resizeTimer = 0;
-
-    function rebuild() {
-      const w = window.innerWidth || document.documentElement.clientWidth || 1024;
-      const count = bgFloatCountForWidth(w);
-      if (count === lastCount && root.childElementCount === count) return;
-      lastCount = count;
-
-      const indices = Array.from({ length: BG_FLOAT_COUNT }, (_, i) => i + 1);
-      shuffleInPlace(indices);
-      const picked = indices.slice(0, count);
-      const zones = BG_EDGE_ZONES.slice();
-      shuffleInPlace(zones);
-      const [minW, maxW] = bgFloatSizeRange(w);
-
-      root.replaceChildren();
-      for (let i = 0; i < picked.length; i++) {
-        const n = String(picked[i]).padStart(2, "0");
-        const zone = zones[i % zones.length];
-        const img = document.createElement("img");
-        img.className = "float-deco";
-        img.alt = "";
-        img.decoding = "async";
-        img.draggable = false;
-        img.src = `${BG_FLOAT_BASE}upgrade02_${n}_shop.png`;
-        const width = Math.round(randBetween(minW, maxW));
-        img.style.width = `${width}px`;
-        img.style.top = `${randBetween(zone.top[0], zone.top[1])}%`;
-        img.style.left = `${randBetween(zone.left[0], zone.left[1])}%`;
-        img.style.animationDuration = `${9 + Math.random() * 5}s`;
-        img.style.animationDelay = `${-Math.random() * 8}s`;
-        root.appendChild(img);
-      }
-    }
-
-    rebuild();
-    window.addEventListener("resize", () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(rebuild, 180);
-    });
-  }
-
   const loginPanel = $("login-panel");
   const dash = $("dash");
   const modalRoot = $("modal-root");
   const modalTitle = $("modal-title");
   const modalBody = $("modal-body");
-  const modalIcon = $("modal-icon");
   const modalActions = $("modal-actions");
   const modalCard = modalRoot?.querySelector(".modal-card") || null;
 
@@ -133,6 +43,14 @@
   let currentView = "overview";
   let cachedUsers = [];
   let lastStats = null;
+  let lastAudit = [];
+  let stuckCount = 0;
+  let settingsCache = {};
+  let userFilter = "all";
+  let userSort = "created_desc";
+  let userSearch = "";
+  let drawerUserId = null;
+  let cashierTab = "create";
 
   function setStatus(el, text, kind) {
     if (!el) return;
@@ -153,6 +71,7 @@
     if (!el) return;
     el.className = "api-chip is-" + (state || "waking");
     el.textContent = text || "";
+    if (state === "ready" || state === "down") paintOverviewAlerts();
   }
 
   async function pingApiHealth(retries) {
@@ -207,7 +126,6 @@
     modalTitle.textContent = title;
     if (bodyHtml) modalBody.innerHTML = bodyHtml;
     else modalBody.textContent = body || "";
-    modalIcon.src = icon || "assets/coin.png";
     modalRoot.classList.remove("hidden");
     modalRoot.setAttribute("aria-hidden", "false");
     const closeBtn = $("modal-close");
@@ -278,7 +196,7 @@
         bodyHtml:
           "<p>" +
           escapeHtml(body || "") +
-          '</p><input class="prompt-input" id="modal-prompt-input" type="text" />',
+          '</p><input class="prompt-input" id="modal-prompt-input" type="text" style="width:100%;padding:9px 12px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit" />',
         icon: icon || "assets/score.png",
       });
       const input = $("modal-prompt-input");
@@ -690,6 +608,494 @@
     return exp ? formatDay(exp) : "ถาวร";
   }
 
+  function formatExpiryCell(u) {
+    if (u.is_permanent) return "ถาวร";
+    const exp = expiryAt(u);
+    return exp ? formatDay(exp) : "—";
+  }
+
+  function bkkDayBounds(offsetDays) {
+    const now = new Date();
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Bangkok",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = fmt.formatToParts(
+      new Date(now.getTime() + offsetDays * 86400000)
+    );
+    const y = parts.find((p) => p.type === "year")?.value;
+    const m = parts.find((p) => p.type === "month")?.value;
+    const d = parts.find((p) => p.type === "day")?.value;
+    const start = new Date(`${y}-${m}-${d}T00:00:00+07:00`);
+    const end = new Date(start.getTime() + 86400000);
+    return { start: start.getTime(), end: end.getTime() };
+  }
+
+  function isExpiringIn(u, offsetDays) {
+    if (u.is_permanent || u.banned_at) return false;
+    const exp = expiryAt(u);
+    if (!exp) return false;
+    const t = new Date(exp).getTime();
+    if (Number.isNaN(t) || t <= Date.now()) return false;
+    const { start, end } = bkkDayBounds(offsetDays);
+    return t >= start && t < end;
+  }
+
+  function countExpiring(offsetDays) {
+    return cachedUsers.filter((u) => isExpiringIn(u, offsetDays)).length;
+  }
+
+  function matchesUserFilter(u) {
+    const st = rentalStatus(u);
+    if (userFilter === "all") return true;
+    if (userFilter === "banned") return st.kind === "banned";
+    if (userFilter === "permanent") return st.kind === "permanent";
+    if (userFilter === "active") return st.kind === "active";
+    if (userFilter === "expired") return st.kind === "expired";
+    if (userFilter === "unset") return st.kind === "unset";
+    return true;
+  }
+
+  function matchesUserSearch(u) {
+    if (!userSearch) return true;
+    const q = userSearch.toLowerCase();
+    return String(u.username || "").toLowerCase().includes(q);
+  }
+
+  function sortUsers(list) {
+    const arr = list.slice();
+    const expTs = (u) => {
+      const e = expiryAt(u);
+      return e ? new Date(e).getTime() : u.is_permanent ? Infinity : 0;
+    };
+    const createdTs = (u) =>
+      u.created_at ? new Date(u.created_at).getTime() : 0;
+    arr.sort((a, b) => {
+      switch (userSort) {
+        case "created_asc":
+          return createdTs(a) - createdTs(b);
+        case "expires_asc":
+          return expTs(a) - expTs(b);
+        case "expires_desc":
+          return expTs(b) - expTs(a);
+        case "name_asc":
+          return String(a.username || "").localeCompare(String(b.username || ""));
+        case "created_desc":
+        default:
+          return createdTs(b) - createdTs(a);
+      }
+    });
+    return arr;
+  }
+
+  function getDisplayUsers() {
+    return sortUsers(cachedUsers.filter((u) => matchesUserFilter(u) && matchesUserSearch(u)));
+  }
+
+  function findUserById(id) {
+    return cachedUsers.find((u) => u.id === id) || null;
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function exportUsersCsv() {
+    const rows = getDisplayUsers();
+    const header = ["username", "created_at", "expires_at", "status", "role"];
+    const lines = [header.join(",")];
+    rows.forEach((u) => {
+      const st = rentalStatus(u);
+      lines.push(
+        [
+          u.username || "",
+          u.created_at || "",
+          expiryAt(u) || (u.is_permanent ? "permanent" : ""),
+          st.label,
+          u.role || "normal",
+        ]
+          .map((v) => '"' + String(v).replace(/"/g, '""') + '"')
+          .join(",")
+      );
+    });
+    const blob = new Blob(["\uFEFF" + lines.join("\n")], {
+      type: "text/csv;charset=utf-8",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "ckr-users-" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function showCashierTab(name) {
+    cashierTab = name || "create";
+    document.querySelectorAll("[data-cashier-tab]").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.getAttribute("data-cashier-tab") === cashierTab);
+    });
+    ["create", "extend", "expires"].forEach((t) => {
+      const el = $("cashier-tab-" + t);
+      if (!el) return;
+      const on = t === cashierTab;
+      el.classList.toggle("is-active", on);
+      el.hidden = !on;
+    });
+  }
+
+  function paintOverviewAlerts() {
+    const root = $("overview-alerts");
+    if (!root) return;
+    const alerts = [];
+    if (!apiReady) {
+      alerts.push({
+        kind: "danger",
+        text: "API ไม่พร้อม — ตรวจสอบเซิร์ฟเวอร์",
+        action: null,
+      });
+    }
+    if (settingsCache.farm_maintenance) {
+      alerts.push({ kind: "warn", text: "ปิดฟาร์มอยู่", action: "system" });
+    }
+    if (settingsCache.topup_maintenance) {
+      alerts.push({ kind: "warn", text: "ปิดเติมเงินอยู่", action: "system" });
+    }
+    if (adminMode === "web" && stuckCount > 0) {
+      alerts.push({
+        kind: "danger",
+        text: "เติมค้าง " + stuckCount + " รายการ",
+        action: "stuck",
+      });
+    }
+    const expToday = countExpiring(0);
+    if (expToday > 0) {
+      alerts.push({
+        kind: "warn",
+        text: "หมดอายุวันนี้ " + expToday + " คน",
+        action: "users-expire",
+      });
+    }
+    if (!alerts.length) {
+      root.innerHTML =
+        '<div class="alert-item is-ok"><span>ไม่มีรายการเร่งด่วน</span></div>';
+      return;
+    }
+    root.innerHTML = alerts
+      .map((a) => {
+        const btn = a.action
+          ? '<button type="button" class="btn btn-ghost btn-sm" data-alert-action="' +
+            escapeHtml(a.action) +
+            '">ดู</button>'
+          : "";
+        return (
+          '<div class="alert-item is-' +
+          a.kind +
+          '"><span>' +
+          escapeHtml(a.text) +
+          "</span>" +
+          btn +
+          "</div>"
+        );
+      })
+      .join("");
+  }
+
+  function paintRecentActivity() {
+    const root = $("recent-activity");
+    if (!root) return;
+    const items = lastAudit.slice(0, 8);
+    if (!items.length) {
+      root.textContent = "ยังไม่มีบันทึก";
+      root.className = "activity-list muted";
+      return;
+    }
+    root.className = "activity-list";
+    root.innerHTML = items
+      .map(
+        (row) =>
+          '<div class="activity-row"><div class="activity-row-head"><strong>' +
+          escapeHtml(row.action) +
+          '</strong><span class="muted">' +
+          escapeHtml(formatDay(row.created_at)) +
+          "</span></div>" +
+          '<div class="muted">' +
+          escapeHtml(row.target_user_id || "—") +
+          "</div></div>"
+      )
+      .join("");
+  }
+
+  function paintStatsCards() {
+    const root = $("daily-stats-cards");
+    if (!root || !lastStats) return;
+    const runs = lastStats.runs || {};
+    const cards = [
+      { label: "ฟาร์มทั้งหมด", value: lastStats.runs_total || 0 },
+      { label: "สำเร็จ", value: runs.succeeded || 0 },
+      { label: "ล้มเหลว", value: runs.failed || 0 },
+    ];
+    if (adminMode === "web") {
+      cards.push({ label: "เติมเงิน", value: lastStats.topups || 0 });
+      cards.push({ label: "ตามมือ", value: lastStats.topups_needs_manual || 0 });
+    }
+    root.className = "mini-stat-grid";
+    root.innerHTML = cards
+      .map(
+        (c) =>
+          '<div class="mini-stat"><span>' +
+          escapeHtml(c.label) +
+          '</span><strong>' +
+          escapeHtml(c.value) +
+          "</strong></div>"
+      )
+      .join("");
+  }
+
+  function closeUserDrawer() {
+    drawerUserId = null;
+    $("user-drawer")?.classList.add("hidden");
+    $("user-drawer")?.setAttribute("aria-hidden", "true");
+  }
+
+  async function openUserDrawer(userId) {
+    const u = findUserById(userId);
+    if (!u) return;
+    drawerUserId = userId;
+    const st = rentalStatus(u);
+    const body = $("drawer-body");
+    const actions = $("drawer-actions");
+    const title = $("drawer-title");
+    if (title) title.textContent = u.username || "ผู้ใช้";
+    if (body) {
+      body.className = "drawer-body";
+      body.innerHTML =
+        '<dl class="drawer-meta">' +
+        "<div><dt>ชื่อผู้ใช้</dt><dd><strong>" +
+        escapeHtml(u.username || "—") +
+        '</strong> <button type="button" class="copy-btn" data-copy="' +
+        escapeHtml(u.username || "") +
+        '">คัดลอก</button></dd></div>' +
+        "<div><dt>สมัครเมื่อ</dt><dd>" +
+        escapeHtml(formatDay(u.created_at)) +
+        "</dd></div>" +
+        "<div><dt>หมดอายุ</dt><dd>" +
+        escapeHtml(formatExpiryCell(u)) +
+        "</dd></div>" +
+        "<div><dt>สถานะ</dt><dd><span class=\"tag tag-" +
+        st.kind +
+        '">' +
+        escapeHtml(st.label) +
+        "</span></dd></div>" +
+        "<div><dt>บทบาท</dt><dd>" +
+        escapeHtml(u.role || "normal") +
+        "</dd></div>" +
+        (u.ban_reason
+          ? "<div><dt>เหตุผลแบน</dt><dd>" + escapeHtml(u.ban_reason) + "</dd></div>"
+          : "") +
+        '</dl><div id="drawer-topups" class="muted">กำลังโหลดประวัติเติม…</div>';
+    }
+    if (actions) {
+      const isSelf = adminId && u.id === adminId;
+      const isAdmin = (u.role || "normal") === "admin";
+      const canMutate = !isSelf && !isAdmin;
+      actions.innerHTML = "";
+      if (canMutate) {
+        actions.appendChild(
+          makeBtn("ต่ออายุ", "btn btn-primary btn-sm", () => {
+            closeUserDrawer();
+            showView("cashier");
+            showCashierTab("extend");
+            if ($("extend-q")) $("extend-q").value = u.username || "";
+            $("extend-lookup-form")?.requestSubmit();
+          })
+        );
+        actions.appendChild(
+          makeBtn("ถาวร", "btn btn-ghost btn-sm", () =>
+            runDrawerAction(() => applyRentalChange({ username: u.username, permanent: true }))
+          )
+        );
+        actions.appendChild(
+          makeBtn(u.banned_at ? "ปลดแบน" : "แบน", "btn btn-ghost btn-sm", () =>
+            u.banned_at ? runDrawerBan(false) : runDrawerBan(true)
+          )
+        );
+        actions.appendChild(
+          makeBtn("ลบ", "btn btn-danger btn-sm", () => runDrawerDelete())
+        );
+      }
+    }
+    $("user-drawer")?.classList.remove("hidden");
+    $("user-drawer")?.setAttribute("aria-hidden", "false");
+    if (adminMode === "web" && u.id) loadDrawerTopups(u.id);
+    else {
+      const tp = $("drawer-topups");
+      if (tp) tp.textContent = "";
+    }
+  }
+
+  async function loadDrawerTopups(userId) {
+    const root = $("drawer-topups");
+    if (!root) return;
+    try {
+      const data = await api("/api/admin/users/" + encodeURIComponent(userId) + "/topups");
+      const items = data.items || [];
+      if (!items.length) {
+        root.textContent = "ยังไม่มีประวัติเติมเงิน";
+        return;
+      }
+      root.innerHTML =
+        "<strong style=\"font-size:0.85rem\">เติมล่าสุด</strong>" +
+        items
+          .map(
+            (row) =>
+              '<div class="activity-row" style="margin-top:6px">' +
+              escapeHtml(row.days_credited || row.package_days || row.tokens_credited || "—") +
+              " วัน · " +
+              escapeHtml(formatDay(row.created_at)) +
+              " · " +
+              escapeHtml(row.credit_status || "") +
+              "</div>"
+          )
+          .join("");
+    } catch (e) {
+      root.textContent = e.message || String(e);
+    }
+  }
+
+  async function runDrawerAction(fn) {
+    const u = findUserById(drawerUserId);
+    if (!u) return;
+    try {
+      await fn();
+      await loadUsers();
+      openUserDrawer(u.id);
+      paintOverviewAlerts();
+    } catch (e) {
+      await showAlertModal({ title: "ไม่สำเร็จ", body: e.message, mode: "error" });
+    }
+  }
+
+  async function runDrawerBan(ban) {
+    const u = findUserById(drawerUserId);
+    if (!u) return;
+    if (ban) {
+      const reason = await showPromptModal({
+        title: "แบนผู้ใช้",
+        body: 'เหตุผลแบน "' + (u.username || "") + '"',
+        placeholder: "เหตุผล",
+        defaultValue: "",
+        confirmLabel: "แบน",
+      });
+      if (reason === null) return;
+      await api("/api/admin/users/" + encodeURIComponent(u.id) + "/ban", {
+        method: "POST",
+        body: { reason: String(reason).trim() },
+      });
+    } else {
+      await api("/api/admin/users/" + encodeURIComponent(u.id) + "/unban", {
+        method: "POST",
+        body: {},
+      });
+    }
+    await loadUsers();
+    openUserDrawer(u.id);
+  }
+
+  async function runDrawerDelete() {
+    const u = findUserById(drawerUserId);
+    if (!u) return;
+    const ok = await showConfirmModal({
+      title: "ลบผู้ใช้?",
+      body: 'ลบ "' + (u.username || "") + '" ถาวร?',
+      confirmLabel: "ลบ",
+      danger: true,
+    });
+    if (!ok) return;
+    await api("/api/admin/users/" + encodeURIComponent(u.id), { method: "DELETE" });
+    closeUserDrawer();
+    await loadUsers();
+  }
+
+  function getFilteredAudit() {
+    const q = ($("audit-search")?.value || "").trim().toLowerCase();
+    const f = $("audit-filter")?.value || "all";
+    return lastAudit.filter((row) => {
+      const action = String(row.action || "").toLowerCase();
+      const target = String(row.target_user_id || "").toLowerCase();
+      if (q && !action.includes(q) && !target.includes(q)) return false;
+      if (f === "all") return true;
+      if (f === "rental")
+        return /rental|extend|permanent|expires|grant|revoke/i.test(action);
+      if (f === "topup") return /topup|credit/i.test(action);
+      if (f === "ban") return /ban|unban/i.test(action);
+      if (f === "user") return /create|delete|user/i.test(action);
+      return true;
+    });
+  }
+
+  function paintAuditList() {
+    const root = $("audit-list");
+    if (!root) return;
+    const items = getFilteredAudit();
+    if (!items.length) {
+      root.textContent = "ไม่พบรายการ";
+      root.className = "admin-list muted";
+      return;
+    }
+    root.className = "admin-list";
+    root.innerHTML = items
+      .map(
+        (row) =>
+          '<div class="admin-row"><div class="admin-row-head"><strong>' +
+          escapeHtml(row.action) +
+          '</strong><span class="muted">' +
+          escapeHtml(formatDay(row.created_at)) +
+          "</span></div>" +
+          '<div class="muted">ผู้ทำ: ' +
+          escapeHtml(row.actor_id || "—") +
+          " · เป้าหมาย: " +
+          escapeHtml(row.target_user_id || "—") +
+          "</div></div>"
+      )
+      .join("");
+  }
+
+  async function lookupUserToBox(q, boxId, inputId) {
+    const box = $(boxId);
+    if (box) {
+      box.textContent = "กำลังค้นหา…";
+      box.className = "lookup-box muted";
+    }
+    try {
+      let row = null;
+      if (adminMode === "day") {
+        const { data, error } = await sb.rpc("admin_lookup_user", { p_query: q });
+        if (!error && data?.ok) row = data;
+      }
+      if (!row) {
+        const legacy = await api("/api/admin/lookup?q=" + encodeURIComponent(q));
+        if (legacy?.ok) row = legacy;
+        else throw new Error(legacy?.reason || "ไม่พบผู้ใช้");
+      }
+      row = enrichUser(row);
+      if (box) {
+        box.className = "lookup-box";
+        box.innerHTML = describeRentalUser(row);
+      }
+      if (inputId && $(inputId)) $(inputId).value = row.username || q;
+      return row;
+    } catch (err) {
+      if (box) box.textContent = err.message || String(err);
+      throw err;
+    }
+  }
+
   async function invokeAdminRental(body) {
     const { data, error } = await sb.functions.invoke(EDGE_ADMIN_FN, { body });
     if (error) {
@@ -748,21 +1154,24 @@
     dash?.classList.toggle("mode-web", adminMode === "web");
     $("mode-day")?.classList.toggle("is-active", adminMode === "day");
     $("mode-web")?.classList.toggle("is-active", adminMode === "web");
-    const hint =
-      adminMode === "day" ? "โหมด: เช่าวัน (PC)" : "โหมด: เช่าวัน (Web)";
-    if ($("overview-mode-hint")) $("overview-mode-hint").textContent = hint;
+    const isPc = adminMode === "day";
+    if ($("overview-mode-hint")) {
+      $("overview-mode-hint").textContent =
+        (isPc ? "โหมด PC" : "โหมด Web") +
+        " · ฟิลด์ " +
+        (isPc ? "expires_at" : "rental_expires_at");
+    }
     if ($("cashier-mode-hint")) {
       $("cashier-mode-hint").textContent =
-        adminMode === "day"
-          ? "เปิดสิทธิ์วันใช้งาน (PC)"
-          : "เปิดสิทธิ์วันใช้งาน (Web)";
+        "เปิดสิทธิ์วันใช้งาน (" + (isPc ? "PC" : "Web") + ")";
     }
-    if ($("kpi-extra-label")) {
-      $("kpi-extra-label").textContent =
-        adminMode === "web" ? "เติมเงินวันนี้" : "เติมเงิน (Web)";
+    if ($("sidebar-mode-label")) {
+      $("sidebar-mode-label").textContent = isPc ? "PC" : "Web";
     }
     loadUsers();
     paintKpis();
+    paintOverviewAlerts();
+    paintStatsCards();
   }
 
   function showView(name) {
@@ -787,13 +1196,20 @@
     if ($("kpi-users")) $("kpi-users").textContent = String(total);
     if ($("kpi-active")) $("kpi-active").textContent = String(active);
     if ($("kpi-expired")) $("kpi-expired").textContent = String(expired);
-    if ($("kpi-extra")) {
-      if (adminMode === "web" && lastStats) {
-        $("kpi-extra").textContent = String(lastStats.topups ?? "—");
-      } else {
-        $("kpi-extra").textContent = "—";
-      }
+    if ($("kpi-expire-today")) $("kpi-expire-today").textContent = String(countExpiring(0));
+    if ($("kpi-expire-tomorrow")) {
+      $("kpi-expire-tomorrow").textContent = String(countExpiring(1));
     }
+    if ($("kpi-topups")) {
+      $("kpi-topups").textContent =
+        adminMode === "web" && lastStats ? String(lastStats.topups ?? "—") : "—";
+    }
+    if ($("users-count-label")) {
+      const shown = getDisplayUsers().length;
+      $("users-count-label").textContent =
+        "แสดง " + shown + " จาก " + total + " คน";
+    }
+    paintOverviewAlerts();
   }
 
   /* ---- Data loaders ---- */
@@ -805,6 +1221,8 @@
     try {
       const data = await api("/api/admin/topups?status=needs_manual");
       const items = data.items || [];
+      stuckCount = items.length;
+      paintOverviewAlerts();
       if (!items.length) {
         root.textContent = "ไม่มีรายการค้าง";
         return;
@@ -845,60 +1263,24 @@
     root.textContent = "กำลังโหลด…";
     root.className = "admin-list muted";
     try {
-      const data = await api("/api/admin/audit?limit=40");
-      const items = data.items || [];
-      if (!items.length) {
-        root.textContent = "ยังไม่มีบันทึก";
-        return;
-      }
-      root.className = "admin-list";
-      root.innerHTML = items
-        .map((row) => {
-          return (
-            '<div class="admin-row"><div class="admin-row-head"><strong>' +
-            escapeHtml(row.action) +
-            '</strong><span class="muted">' +
-            escapeHtml(formatDay(row.created_at)) +
-            "</span></div>" +
-            '<div class="muted">ผู้ทำ: ' +
-            escapeHtml(row.actor_id || "—") +
-            " · เป้าหมาย: " +
-            escapeHtml(row.target_user_id || "—") +
-            "</div></div>"
-          );
-        })
-        .join("");
+      const data = await api("/api/admin/audit?limit=80");
+      lastAudit = data.items || [];
+      paintAuditList();
+      paintRecentActivity();
     } catch (e) {
       root.textContent = e.message || String(e);
     }
   }
 
   async function loadStats() {
-    const root = $("daily-stats");
+    const root = $("daily-stats-cards");
     if (!root) return;
     root.textContent = "กำลังโหลด…";
-    root.className = "stats-box muted";
+    root.className = "mini-stat-grid muted";
     try {
       const data = await api("/api/admin/stats");
       lastStats = data;
-      const runs = data.runs || {};
-      root.className = "stats-box";
-      root.innerHTML =
-        "<strong>วันที่ " +
-        escapeHtml(data.date) +
-        "</strong><br>ฟาร์ม: " +
-        escapeHtml(data.runs_total || 0) +
-        " (สำเร็จ " +
-        escapeHtml(runs.succeeded || 0) +
-        " · ล้ม " +
-        escapeHtml(runs.failed || 0) +
-        ")" +
-        (adminMode === "web"
-          ? "<br>เติมเงิน: " +
-            escapeHtml(data.topups || 0) +
-            " · ตามมือ: " +
-            escapeHtml(data.topups_needs_manual || 0)
-          : "");
+      paintStatsCards();
       paintKpis();
     } catch (e) {
       root.textContent = e.message || String(e);
@@ -908,89 +1290,76 @@
   async function loadSettings() {
     try {
       const data = await api("/api/admin/settings");
+      settingsCache = data;
       if ($("set-farm-maint")) $("set-farm-maint").checked = !!data.farm_maintenance;
       if ($("set-topup-maint")) $("set-topup-maint").checked = !!data.topup_maintenance;
+      paintOverviewAlerts();
     } catch (_) {}
   }
 
   function renderUsers(users) {
-    const thead = $("users-thead");
     const body = $("users-body");
-    if (!thead || !body) return;
+    const cards = $("users-cards");
+    const list = users || getDisplayUsers();
 
-    thead.innerHTML =
-      "<tr><th>ชื่อผู้ใช้</th><th>บทบาท</th><th>สถานะเช่า</th><th>รายละเอียด</th><th>การทำงาน</th></tr>";
-
-    if (!users.length) {
-      body.innerHTML =
-        '<tr><td class="muted" colspan="5">ยังไม่มีผู้ใช้</td></tr>';
-      return;
+    if (body) {
+      if (!list.length) {
+        body.innerHTML = '<tr><td class="muted" colspan="5">ไม่พบผู้ใช้</td></tr>';
+      } else {
+        body.innerHTML = list
+          .map((u) => {
+            const st = rentalStatus(u);
+            return (
+              '<tr data-user-id="' +
+              escapeHtml(u.id || "") +
+              '" data-username="' +
+              escapeHtml(u.username || "") +
+              '"><td data-label="ชื่อผู้ใช้"><div class="user-cell"><strong class="user-name">' +
+              escapeHtml(u.username || "—") +
+              '</strong><button type="button" class="copy-btn" data-copy="' +
+              escapeHtml(u.username || "") +
+              '" title="คัดลอก">⎘</button></div></td><td data-label="สมัครเมื่อ" class="muted">' +
+              escapeHtml(formatDay(u.created_at)) +
+              '</td><td data-label="หมดอายุ" class="muted">' +
+              escapeHtml(formatExpiryCell(u)) +
+              '</td><td data-label="สถานะ"><span class="tag tag-' +
+              st.kind +
+              '">' +
+              escapeHtml(st.label) +
+              '</span></td><td data-label=""><button type="button" class="btn btn-ghost btn-sm" data-action="open-drawer">จัดการ</button></td></tr>'
+            );
+          })
+          .join("");
+      }
     }
 
-    body.innerHTML = users
-      .map((u) => {
-        const id = escapeHtml(u.id || "");
-        const name = escapeHtml(u.username || "—");
-        const unameAttr = escapeHtml(u.username || "");
-        const role = escapeHtml(u.role || "normal");
-        const isSelf = adminId && u.id === adminId;
-        const isAdmin = (u.role || "normal") === "admin";
-        const banned = !!u.banned_at;
-        const canMutate = !isSelf && !isAdmin;
-        const st = rentalStatus(u);
-
-        const midCols =
-          '<td data-label="สถานะเช่า"><span class="tag tag-' +
-          st.kind +
-          '">' +
-          escapeHtml(st.label) +
-          '</span></td><td data-label="รายละเอียด" class="muted">' +
-          escapeHtml(st.detail) +
-          "</td>";
-
-        const actions = [];
-        if (canMutate) {
-          actions.push(
-            '<button type="button" class="btn btn-primary btn-sm" data-action="quick-extend">ต่ออายุ</button>'
-          );
-          actions.push(
-            '<button type="button" class="btn btn-ghost btn-sm" data-action="make-permanent">ถาวร</button>'
-          );
-        }
-        if (canMutate) {
-          if (banned) {
-            actions.push(
-              '<button type="button" class="btn btn-ghost btn-sm" data-action="unban-user">ปลดแบน</button>'
+    if (cards) {
+      if (!list.length) {
+        cards.innerHTML = '<p class="muted">ไม่พบผู้ใช้</p>';
+      } else {
+        cards.innerHTML = list
+          .map((u) => {
+            const st = rentalStatus(u);
+            return (
+              '<article class="user-card" data-user-id="' +
+              escapeHtml(u.id || "") +
+              '"><div class="user-card-head"><strong>' +
+              escapeHtml(u.username || "—") +
+              '</strong><span class="tag tag-' +
+              st.kind +
+              '">' +
+              escapeHtml(st.label) +
+              '</span></div><div class="user-card-meta"><span>สมัคร: ' +
+              escapeHtml(formatDay(u.created_at)) +
+              "</span><span>หมดอายุ: " +
+              escapeHtml(formatExpiryCell(u)) +
+              "</span></div></article>"
             );
-          } else {
-            actions.push(
-              '<button type="button" class="btn btn-ghost btn-sm" data-action="ban-user">แบน</button>'
-            );
-          }
-          actions.push(
-            '<button type="button" class="btn btn-danger btn-sm" data-action="delete-user">ลบ</button>'
-          );
-        } else if (isSelf) {
-          actions.push('<span class="muted">คุณ</span>');
-        }
-
-        return (
-          '<tr data-user-id="' +
-          id +
-          '" data-username="' +
-          unameAttr +
-          '"><td data-label="ชื่อผู้ใช้"><strong class="user-name">' +
-          name +
-          '</strong></td><td data-label="บทบาท"><span class="tag tag-role">' +
-          role +
-          "</span></td>" +
-          midCols +
-          '<td data-label="การทำงาน"><div class="row-actions">' +
-          actions.join("") +
-          "</div></td></tr>"
-        );
-      })
-      .join("");
+          })
+          .join("");
+      }
+    }
+    paintKpis();
   }
 
   async function loadUsers() {
@@ -1013,7 +1382,7 @@
         users = data.users || [];
       }
       cachedUsers = users;
-      renderUsers(users);
+      renderUsers();
       paintKpis();
       setStatus(listStatus, "", "muted");
     } catch (e) {
@@ -1031,6 +1400,7 @@
     if ($("who-user-mobile")) $("who-user-mobile").textContent = whoName;
     setMode(adminMode);
     showView("overview");
+    showCashierTab("create");
     await Promise.all([
       loadUsers(),
       loadStuckTopups(),
@@ -1187,16 +1557,112 @@
   $("mode-web")?.addEventListener("click", () => setMode("web"));
 
   $("users-body")?.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-action]");
-    if (!btn) return;
-    const row = btn.closest("[data-user-id]");
+    const copyBtn = e.target.closest("[data-copy]");
+    if (copyBtn) {
+      e.stopPropagation();
+      copyText(copyBtn.getAttribute("data-copy") || "").then((ok) => {
+        if (ok) copyBtn.textContent = "✓";
+        setTimeout(() => {
+          copyBtn.textContent = "⎘";
+        }, 1200);
+      });
+      return;
+    }
+    const row = e.target.closest("[data-user-id]");
     if (!row) return;
-    const action = btn.getAttribute("data-action");
-    if (action === "delete-user") deleteUser(row);
-    if (action === "ban-user") banUser(row);
-    if (action === "unban-user") unbanUser(row);
-    if (action === "quick-extend") quickExtendUser(row);
-    if (action === "make-permanent") makePermanentUser(row);
+    const actionBtn = e.target.closest("[data-action]");
+    if (actionBtn?.getAttribute("data-action") === "open-drawer" || !actionBtn) {
+      openUserDrawer(row.getAttribute("data-user-id"));
+    }
+  });
+
+  $("users-cards")?.addEventListener("click", (e) => {
+    const card = e.target.closest("[data-user-id]");
+    if (card) openUserDrawer(card.getAttribute("data-user-id"));
+  });
+
+  $("drawer-close")?.addEventListener("click", closeUserDrawer);
+  $("drawer-backdrop")?.addEventListener("click", closeUserDrawer);
+  $("drawer-body")?.addEventListener("click", (e) => {
+    const copyBtn = e.target.closest("[data-copy]");
+    if (!copyBtn) return;
+    copyText(copyBtn.getAttribute("data-copy") || "");
+  });
+
+  document.querySelectorAll("[data-user-filter]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      userFilter = btn.getAttribute("data-user-filter") || "all";
+      document.querySelectorAll("[data-user-filter]").forEach((b) => {
+        b.classList.toggle("is-active", b === btn);
+      });
+      renderUsers();
+    });
+  });
+
+  $("users-search")?.addEventListener("input", (e) => {
+    userSearch = e.target.value.trim();
+    renderUsers();
+  });
+
+  $("users-sort")?.addEventListener("change", (e) => {
+    userSort = e.target.value || "created_desc";
+    renderUsers();
+  });
+
+  $("export-csv-btn")?.addEventListener("click", () => exportUsersCsv());
+
+  $("audit-search")?.addEventListener("input", () => paintAuditList());
+  $("audit-filter")?.addEventListener("change", () => paintAuditList());
+
+  document.querySelectorAll("[data-cashier-tab]").forEach((btn) => {
+    btn.addEventListener("click", () =>
+      showCashierTab(btn.getAttribute("data-cashier-tab"))
+    );
+  });
+
+  $("overview-alerts")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-alert-action]");
+    if (!btn) return;
+    const action = btn.getAttribute("data-alert-action");
+    if (action === "system") showView("system");
+    if (action === "stuck") {
+      showView("system");
+      document.querySelector(".mode-web-only")?.scrollIntoView({ behavior: "smooth" });
+    }
+    if (action === "users-expire") {
+      userFilter = "active";
+      document.querySelectorAll("[data-user-filter]").forEach((b) => {
+        b.classList.toggle("is-active", b.getAttribute("data-user-filter") === "active");
+      });
+      showView("users");
+      renderUsers();
+    }
+  });
+
+  document.querySelectorAll("[data-shortcut]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const s = btn.getAttribute("data-shortcut");
+      if (s === "search-user") {
+        showView("users");
+        $("users-search")?.focus();
+      }
+      if (s === "create-user") {
+        showView("cashier");
+        showCashierTab("create");
+      }
+      if (s === "extend-user") {
+        showView("cashier");
+        showCashierTab("extend");
+        $("extend-q")?.focus();
+      }
+      if (s === "stuck-topups") {
+        showView("system");
+      }
+    });
+  });
+
+  $("refresh-overview-btn")?.addEventListener("click", async () => {
+    await Promise.all([loadUsers(), loadStats(), loadAudit(), loadStuckTopups(), loadSettings()]);
   });
 
   $("login-form")?.addEventListener("submit", async (e) => {
@@ -1250,7 +1716,6 @@
   $("refresh-btn")?.addEventListener("click", () => loadUsers());
   $("refresh-stuck-btn")?.addEventListener("click", () => loadStuckTopups());
   $("refresh-audit-btn")?.addEventListener("click", () => loadAudit());
-  $("refresh-stats-btn")?.addEventListener("click", () => loadStats());
 
   $("save-settings-btn")?.addEventListener("click", async () => {
     setStatus($("settings-status"), "กำลังบันทึก…", "muted");
@@ -1390,31 +1855,17 @@
   $("extend-lookup-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const q = $("extend-q").value.trim();
-    const box = $("extend-result");
-    if (box) {
-      box.textContent = "กำลังค้นหา…";
-      box.className = "lookup-box muted";
-    }
     try {
-      let row = null;
-      if (adminMode === "day") {
-        const { data, error } = await sb.rpc("admin_lookup_user", { p_query: q });
-        if (!error && data?.ok) row = data;
-      }
-      if (!row) {
-        const legacy = await api("/api/admin/lookup?q=" + encodeURIComponent(q));
-        if (legacy?.ok) row = legacy;
-        else throw new Error(legacy?.reason || "ไม่พบผู้ใช้");
-      }
-      row = enrichUser(row);
-      if (box) {
-        box.className = "lookup-box";
-        box.innerHTML = describeRentalUser(row);
-      }
-      if ($("extend-q")) $("extend-q").value = row.username || q;
-    } catch (err) {
-      if (box) box.textContent = err.message || String(err);
-    }
+      await lookupUserToBox(q, "extend-result", "extend-q");
+    } catch (_) {}
+  });
+
+  $("expires-lookup-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const q = $("expires-q").value.trim();
+    try {
+      await lookupUserToBox(q, "expires-result", "expires-q");
+    } catch (_) {}
   });
 
   $("extend-form")?.addEventListener("submit", async (e) => {
@@ -1493,13 +1944,13 @@
   });
 
   $("set-expires-btn")?.addEventListener("click", async () => {
-    const username = $("extend-q")?.value.trim();
+    const username = ($("expires-q")?.value || $("extend-q")?.value || "").trim();
     if (!username) {
-      setStatus($("extend-status"), "ใส่ชื่อผู้ใช้ก่อน", "err");
+      setStatus($("expires-status"), "ใส่ชื่อผู้ใช้ก่อน", "err");
       return;
     }
     $("set-expires-btn").disabled = true;
-    setStatus($("extend-status"), "กำลังตั้งวันหมดอายุ…", "muted");
+    setStatus($("expires-status"), "กำลังตั้งวันหมดอายุ…", "muted");
     try {
       const expiresAtIso = parseDatetimeLocal($("extend-expires-at")?.value);
       if (!expiresAtIso) throw new Error("เลือกวันและเวลาหมดอายุ");
@@ -1507,7 +1958,7 @@
       const u = enrichUser(data.user || { username });
       const st = rentalStatus(u);
       setStatus(
-        $("extend-status"),
+        $("expires-status"),
         "ตั้งหมดอายุแล้ว: " + (u.username || username) + " · " + st.label,
         "ok"
       );
@@ -1516,33 +1967,20 @@
         "User: " + (u.username || username),
         "หมดอายุ: " + rentalReceiptExpiry(u),
       ]);
-      if ($("extend-result")) {
-        $("extend-result").className = "lookup-box";
-        $("extend-result").innerHTML = describeRentalUser(u);
+      if ($("expires-result")) {
+        $("expires-result").className = "lookup-box";
+        $("expires-result").innerHTML = describeRentalUser(u);
       }
-      if ($("extend-permanent")) $("extend-permanent").checked = false;
-      setFreeTrial("extend", false);
-      syncDurationVisibility("extend");
       await loadUsers();
     } catch (err) {
-      setStatus($("extend-status"), err.message || String(err), "err");
+      setStatus($("expires-status"), err.message || String(err), "err");
     } finally {
       $("set-expires-btn").disabled = false;
     }
   });
 
-  $("quick-search-form")?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const q = $("quick-search").value.trim();
-    if (!q) return;
-    showView("cashier");
-    if ($("extend-q")) $("extend-q").value = q;
-    $("extend-lookup-form")?.requestSubmit();
-  });
-
   sessionToken = loadStoredSessionToken();
   pingApiHealth(2).catch(() => {});
-  initBgFloaters();
 
   (async () => {
     const ctx = await requireAdminSession();

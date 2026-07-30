@@ -4,33 +4,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CKR Admin Console</title>
-  <meta name="description" content="CKR WWDC POS admin — เช่าวัน PC / เช่าวัน Web" />
+  <meta name="description" content="CKR WWDC Admin — เช่าวัน PC / Web" />
   <meta name="color-scheme" content="dark" />
-  <meta name="theme-color" content="#1a0f0a" />
+  <meta name="theme-color" content="#111318" />
   <link rel="icon" href="assets/logo_4k.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260730-rental2" />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css?v=20260730-ui3" />
 </head>
 <body>
-  <div class="bakery-bg" aria-hidden="true">
-    <div class="bakery-glow bakery-glow-a"></div>
-    <div class="bakery-glow bakery-glow-b"></div>
-    <div class="crumb-pattern"></div>
-    <div id="bg-floaters" class="bg-floaters"></div>
-  </div>
-
   <!-- LOGIN -->
   <section id="login-panel" class="view login-view">
     <div class="login-card">
-      <img class="login-deco login-deco-a" src="assets_web/pet81_jelly.png" alt="" width="56" height="56" />
-      <img class="login-deco login-deco-b" src="assets_web/icon_giftpoint.png" alt="" width="48" height="48" />
       <div class="login-brand">
-        <img src="assets/logo_4k.png" width="48" height="48" alt="" />
+        <img src="assets/logo_4k.png" width="44" height="44" alt="" />
         <div>
-          <h1>CKR Admin Console</h1>
-          <p>POS · จัดการวันใช้งาน PC &amp; Web</p>
+          <h1>CKR Admin</h1>
+          <p>จัดการเช่าวัน PC &amp; Web</p>
         </div>
       </div>
       <form id="login-form" autocomplete="on">
@@ -42,269 +33,329 @@
           <span>รหัสผ่าน</span>
           <input id="login-pass" name="password" type="password" required autocomplete="current-password" />
         </label>
-        <button class="btn btn-primary" type="submit" id="login-btn">เข้าสู่ระบบ</button>
+        <button class="btn btn-primary btn-block" type="submit" id="login-btn">เข้าสู่ระบบ</button>
         <p id="login-status" class="status muted" role="status"></p>
       </form>
     </div>
   </section>
 
-  <!-- POS SHELL -->
+  <!-- SHELL -->
   <div id="dash" class="pos-shell view hidden">
     <aside class="pos-sidebar" aria-label="เมนูหลัก">
       <div class="sidebar-brand">
-        <img src="assets/logo_4k.png" width="36" height="36" alt="" />
+        <img src="assets/logo_4k.png" width="32" height="32" alt="" />
         <div>
           <strong>CKR Admin</strong>
-          <span>Console</span>
+          <span id="sidebar-mode-label">PC</span>
         </div>
       </div>
       <nav class="sidebar-nav pos-bottom-nav" aria-label="แท็บหลัก">
         <button type="button" class="nav-item is-active" data-view="overview">
-          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2" fill="currentColor" opacity=".85"/><rect x="13" y="3" width="8" height="5" rx="2" fill="currentColor" opacity=".55"/><rect x="13" y="10" width="8" height="11" rx="2" fill="currentColor" opacity=".7"/><rect x="3" y="13" width="8" height="8" rx="2" fill="currentColor" opacity=".55"/></svg>
-          <span>ภาพรวม</span>
+          <span class="nav-dot"></span><span>ภาพรวม</span>
         </button>
         <button type="button" class="nav-item" data-view="users">
-          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5" fill="currentColor"/><path d="M3 19c0-3.3 2.7-5 6-5s6 1.7 6 5" fill="currentColor" opacity=".75"/><circle cx="17" cy="9" r="2.5" fill="currentColor" opacity=".55"/><path d="M15 19c.3-2.2 1.8-3.5 4-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" opacity=".55"/></svg>
-          <span>ผู้ใช้</span>
+          <span class="nav-dot"></span><span>ผู้ใช้</span>
         </button>
         <button type="button" class="nav-item" data-view="cashier">
-          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="3" fill="currentColor" opacity=".7"/><rect x="3" y="9" width="18" height="3" fill="currentColor"/><circle cx="12" cy="15" r="2.5" fill="currentColor" opacity=".9"/></svg>
-          <span>แคชเชียร์</span>
+          <span class="nav-dot"></span><span>แคชเชียร์</span>
         </button>
         <button type="button" class="nav-item" data-view="system">
-          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z" fill="currentColor" opacity=".75"/><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-          <span>ระบบ</span>
+          <span class="nav-dot"></span><span>ระบบ</span>
         </button>
       </nav>
       <div class="sidebar-foot">
         <p id="who-user" class="sidebar-who">—</p>
-        <button type="button" id="logout-btn" class="btn btn-ghost btn-block">ออกจากระบบ</button>
+        <button type="button" id="logout-btn" class="btn btn-ghost btn-block btn-sm">ออกจากระบบ</button>
       </div>
     </aside>
 
     <div class="pos-main">
       <header class="pos-topbar">
         <div class="mobile-top-brand">
-          <img src="assets/logo_4k.png" width="32" height="32" alt="" />
-          <div class="mobile-brand-text">
-            <strong>CKR Admin</strong>
-            <span id="who-user-mobile" class="mobile-who">—</span>
-          </div>
+          <strong>CKR Admin</strong>
+          <span id="who-user-mobile" class="mobile-who">—</span>
           <button type="button" id="logout-btn-mobile" class="btn btn-ghost btn-sm">ออก</button>
         </div>
-        <div class="mode-switch" role="group" aria-label="โหมดการเติม">
-          <button type="button" class="mode-btn is-active" data-mode="day" id="mode-day"><span class="mode-long">เช่าวัน (PC)</span><span class="mode-short">PC</span></button>
-          <button type="button" class="mode-btn" data-mode="web" id="mode-web"><span class="mode-long">เช่าวัน (Web)</span><span class="mode-short">Web</span></button>
+        <div class="mode-switch" role="group" aria-label="โหมด">
+          <button type="button" class="mode-btn is-active" data-mode="day" id="mode-day">PC</button>
+          <button type="button" class="mode-btn" data-mode="web" id="mode-web">Web</button>
         </div>
         <div class="topbar-right">
-          <form id="quick-search-form" class="quick-search">
-            <input id="quick-search" type="search" placeholder="ค้นหา username…" spellcheck="false" autocomplete="off" />
-            <button type="submit" class="btn btn-ghost btn-sm">ค้นหา</button>
-          </form>
           <div id="api-status" class="api-chip is-waking" aria-live="polite">API…</div>
-          <span id="nav-admin" class="pill">Admin</span>
         </div>
       </header>
 
-      <!-- OVERVIEW -->
-      <section id="view-overview" class="pos-view is-active" data-panel="overview">
-        <div class="view-head">
-          <h2>ภาพรวม</h2>
-          <p class="muted" id="overview-mode-hint">โหมด: เช่าวัน (PC)</p>
-        </div>
-        <div class="kpi-grid">
-          <article class="kpi-card">
-            <img class="kpi-icon" src="assets_web/level.png" alt="" width="36" height="36" />
-            <span class="kpi-label">ผู้ใช้ทั้งหมด</span>
-            <strong id="kpi-users" class="kpi-value">—</strong>
-          </article>
-          <article class="kpi-card kpi-day">
-            <img class="kpi-icon" src="assets_web/tr_ga170.png" alt="" width="36" height="36" />
-            <span class="kpi-label">กำลังเช่า / ถาวร</span>
-            <strong id="kpi-active" class="kpi-value">—</strong>
-          </article>
-          <article class="kpi-card kpi-day">
-            <img class="kpi-icon" src="assets_web/notice_b19.png" alt="" width="36" height="36" />
-            <span class="kpi-label">หมดอายุ / ยังไม่ตั้ง</span>
-            <strong id="kpi-expired" class="kpi-value">—</strong>
-          </article>
-          <article class="kpi-card kpi-web">
-            <img class="kpi-icon" src="assets_web/coin.png" alt="" width="36" height="36" />
-            <span class="kpi-label" id="kpi-extra-label">เติมเงินวันนี้</span>
-            <strong id="kpi-extra" class="kpi-value">—</strong>
-          </article>
-        </div>
-        <div class="panel">
-          <div class="panel-head-row">
-            <h3>สถิติวันนี้</h3>
-            <button type="button" class="btn btn-ghost btn-sm" id="refresh-stats-btn">รีเฟรช</button>
-          </div>
-          <div id="daily-stats" class="stats-box muted">กำลังโหลด…</div>
-        </div>
-      </section>
+      <div class="pos-content">
 
-      <!-- USERS -->
-      <section id="view-users" class="pos-view" data-panel="users">
-        <div class="view-head">
-          <h2>ผู้ใช้</h2>
-          <button type="button" class="btn btn-ghost btn-sm" id="refresh-btn">รีเฟรช</button>
-        </div>
-        <div class="table-wrap panel">
-          <table class="data-table" id="users-table">
-            <thead id="users-thead"></thead>
-            <tbody id="users-body">
-              <tr><td class="muted" colspan="6">กำลังโหลด…</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p id="list-status" class="status muted" role="status"></p>
-      </section>
-
-      <!-- CASHIER -->
-      <section id="view-cashier" class="pos-view" data-panel="cashier">
-        <div class="view-head">
-          <h2>แคชเชียร์</h2>
-          <p class="muted" id="cashier-mode-hint">เปิดสิทธิ์วันใช้งาน</p>
-        </div>
-        <div class="cashier-grid">
-          <div class="cashier-forms">
-            <div class="panel">
-              <h3>สร้างผู้ใช้ + เปิดวัน</h3>
-              <form id="create-form">
-                <div class="grid-2">
-                  <label class="field">
-                    <span>ชื่อผู้ใช้</span>
-                    <input id="create-user" type="text" required minlength="2" maxlength="64" pattern="[A-Za-z0-9._\-]{2,64}" autocomplete="off" spellcheck="false" />
-                  </label>
-                  <label class="field">
-                    <span>รหัสผ่าน</span>
-                    <input id="create-pass" type="password" required minlength="6" autocomplete="new-password" />
-                  </label>
-                </div>
-                <label class="toggle-field">
-                  <input type="checkbox" id="create-permanent" />
-                  <span>บัญชีถาวร</span>
-                </label>
-                <div id="create-duration-block" class="duration-block" data-free-trial="0">
-                  <div class="pack-row pack-row-wide">
-                    <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="1" data-pack-target="create">1 วัน</button>
-                    <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="7" data-pack-target="create">7 วัน</button>
-                    <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="30" data-pack-target="create">30 วัน</button>
-                    <button type="button" class="btn btn-ghost btn-sm pack-btn pack-trial" data-pack-hours="1" data-pack-free-trial="1" data-pack-target="create">ทดลอง 1 ชม.</button>
-                    <button type="button" class="btn btn-ghost btn-sm pack-btn pack-permanent" data-pack-permanent="1" data-pack-target="create">ถาวร</button>
-                  </div>
-                  <div class="grid-3">
-                    <label class="field"><span>วัน</span><input id="create-days" type="number" min="0" max="3650" value="1" /></label>
-                    <label class="field"><span>ชม.</span><input id="create-hours" type="number" min="0" max="23" value="0" /></label>
-                    <label class="field"><span>นาที</span><input id="create-minutes" type="number" min="0" max="59" value="0" /></label>
-                  </div>
-                </div>
-                <button class="btn btn-primary" type="submit" id="create-btn">สร้างผู้ใช้</button>
-                <p id="create-status" class="status muted" role="status"></p>
-              </form>
+        <!-- OVERVIEW -->
+        <section id="view-overview" class="pos-view is-active" data-panel="overview">
+          <div class="view-head">
+            <div>
+              <h2>ภาพรวม</h2>
+              <p class="muted" id="overview-mode-hint">โหมด PC · ฟิลด์ expires_at</p>
             </div>
+            <button type="button" class="btn btn-ghost btn-sm" id="refresh-overview-btn">รีเฟรช</button>
+          </div>
 
+          <div id="overview-alerts" class="alert-list" aria-live="polite"></div>
+
+          <div class="shortcut-row">
+            <button type="button" class="shortcut-btn" data-shortcut="search-user">ค้นหาผู้ใช้</button>
+            <button type="button" class="shortcut-btn" data-shortcut="create-user">สร้างบัญชี</button>
+            <button type="button" class="shortcut-btn" data-shortcut="extend-user">ต่ออายุ</button>
+            <button type="button" class="shortcut-btn mode-web-only" data-shortcut="stuck-topups">เติมค้าง</button>
+          </div>
+
+          <div class="kpi-grid">
+            <article class="kpi-card"><span class="kpi-label">ผู้ใช้ทั้งหมด</span><strong id="kpi-users" class="kpi-value">—</strong></article>
+            <article class="kpi-card kpi-ok"><span class="kpi-label">ใช้งานได้ / ถาวร</span><strong id="kpi-active" class="kpi-value">—</strong></article>
+            <article class="kpi-card kpi-warn"><span class="kpi-label">หมดอายุวันนี้</span><strong id="kpi-expire-today" class="kpi-value">—</strong></article>
+            <article class="kpi-card kpi-warn"><span class="kpi-label">หมดอายุพรุ่งนี้</span><strong id="kpi-expire-tomorrow" class="kpi-value">—</strong></article>
+            <article class="kpi-card"><span class="kpi-label">หมดอายุ / ยังไม่ตั้ง</span><strong id="kpi-expired" class="kpi-value">—</strong></article>
+            <article class="kpi-card kpi-web mode-web-only"><span class="kpi-label">เติมเงินวันนี้</span><strong id="kpi-topups" class="kpi-value">—</strong></article>
+          </div>
+
+          <div class="overview-split">
             <div class="panel">
-              <h3>ต่ออายุ / ถาวร / ตัดสิทธิ์</h3>
-              <form id="extend-lookup-form" class="inline-row">
-                <label class="field grow">
-                  <span>ชื่อผู้ใช้</span>
-                  <input id="extend-q" type="text" required spellcheck="false" autocomplete="off" />
-                </label>
-                <button class="btn btn-ghost" type="submit">ค้นหา</button>
-              </form>
-              <div id="extend-result" class="lookup-box muted">—</div>
-              <form id="extend-form">
-                <label class="toggle-field">
-                  <input type="checkbox" id="extend-permanent" />
-                  <span>ตั้งเป็นถาวร</span>
-                </label>
-                <div id="extend-duration-block" class="duration-block" data-free-trial="0">
-                  <div class="pack-row pack-row-wide">
-                    <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="1" data-pack-target="extend">+1 วัน</button>
-                    <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="7" data-pack-target="extend">+7 วัน</button>
-                    <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="30" data-pack-target="extend">+30 วัน</button>
-                    <button type="button" class="btn btn-ghost btn-sm pack-btn pack-trial" data-pack-hours="1" data-pack-free-trial="1" data-pack-target="extend">ทดลอง 1 ชม.</button>
-                    <button type="button" class="btn btn-ghost btn-sm pack-btn pack-permanent" data-pack-permanent="1" data-pack-target="extend">ถาวร</button>
+              <div class="panel-head-row"><h3>สถิติวันนี้</h3></div>
+              <div id="daily-stats-cards" class="mini-stat-grid muted">กำลังโหลด…</div>
+            </div>
+            <div class="panel">
+              <div class="panel-head-row"><h3>กิจกรรมล่าสุด</h3></div>
+              <div id="recent-activity" class="activity-list muted">กำลังโหลด…</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- USERS -->
+        <section id="view-users" class="pos-view" data-panel="users">
+          <div class="view-head">
+            <div>
+              <h2>ผู้ใช้</h2>
+              <p class="muted" id="users-count-label">—</p>
+            </div>
+            <div class="view-head-actions">
+              <button type="button" class="btn btn-ghost btn-sm" id="export-csv-btn">Export CSV</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="refresh-btn">รีเฟรช</button>
+            </div>
+          </div>
+
+          <div class="users-toolbar panel">
+            <input id="users-search" type="search" placeholder="ค้นหา username…" spellcheck="false" autocomplete="off" />
+            <select id="users-sort" class="select-input" aria-label="เรียงลำดับ">
+              <option value="created_desc">สมัครล่าสุด</option>
+              <option value="created_asc">สมัครเก่าสุด</option>
+              <option value="expires_asc">หมดอายุเร็วสุด</option>
+              <option value="expires_desc">หมดอายุช้าสุด</option>
+              <option value="name_asc">ชื่อ A–Z</option>
+            </select>
+          </div>
+
+          <div class="filter-chips" role="group" aria-label="กรองสถานะ">
+            <button type="button" class="chip is-active" data-user-filter="all">ทั้งหมด</button>
+            <button type="button" class="chip" data-user-filter="active">ใช้งานได้</button>
+            <button type="button" class="chip" data-user-filter="permanent">ถาวร</button>
+            <button type="button" class="chip" data-user-filter="expired">หมดอายุ</button>
+            <button type="button" class="chip" data-user-filter="unset">ยังไม่ตั้ง</button>
+            <button type="button" class="chip" data-user-filter="banned">แบน</button>
+          </div>
+
+          <div class="table-wrap panel users-desktop">
+            <table class="data-table" id="users-table">
+              <thead>
+                <tr>
+                  <th>ชื่อผู้ใช้</th>
+                  <th>สมัครเมื่อ</th>
+                  <th>หมดอายุ</th>
+                  <th>สถานะ</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="users-body">
+                <tr><td class="muted" colspan="5">กำลังโหลด…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="users-cards" class="users-mobile"></div>
+          <p id="list-status" class="status muted" role="status"></p>
+        </section>
+
+        <!-- CASHIER -->
+        <section id="view-cashier" class="pos-view" data-panel="cashier">
+          <div class="view-head">
+            <div>
+              <h2>แคชเชียร์</h2>
+              <p class="muted" id="cashier-mode-hint">เปิดสิทธิ์วันใช้งาน (PC)</p>
+            </div>
+          </div>
+
+          <div class="cashier-grid">
+            <div class="cashier-main">
+              <div class="tab-bar" role="tablist">
+                <button type="button" class="tab-btn is-active" data-cashier-tab="create" role="tab">สร้างใหม่</button>
+                <button type="button" class="tab-btn" data-cashier-tab="extend" role="tab">ต่ออายุ</button>
+                <button type="button" class="tab-btn" data-cashier-tab="expires" role="tab">ตั้งวันหมดอายุ</button>
+              </div>
+
+              <div id="cashier-tab-create" class="cashier-tab panel is-active" role="tabpanel">
+                <form id="create-form">
+                  <div class="grid-2">
+                    <label class="field">
+                      <span>ชื่อผู้ใช้</span>
+                      <input id="create-user" type="text" required minlength="2" maxlength="64" pattern="[A-Za-z0-9._\-]{2,64}" autocomplete="off" spellcheck="false" />
+                    </label>
+                    <label class="field">
+                      <span>รหัสผ่าน</span>
+                      <input id="create-pass" type="password" required minlength="6" autocomplete="new-password" />
+                    </label>
                   </div>
-                  <div class="grid-3">
-                    <label class="field"><span>วัน</span><input id="extend-days" type="number" min="0" max="3650" value="1" /></label>
-                    <label class="field"><span>ชม.</span><input id="extend-hours" type="number" min="0" max="23" value="0" /></label>
-                    <label class="field"><span>นาที</span><input id="extend-minutes" type="number" min="0" max="59" value="0" /></label>
+                  <label class="toggle-field">
+                    <input type="checkbox" id="create-permanent" />
+                    <span>บัญชีถาวร</span>
+                  </label>
+                  <div id="create-duration-block" class="duration-block" data-free-trial="0">
+                    <div class="pack-row pack-row-wide">
+                      <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="1" data-pack-target="create">1 วัน</button>
+                      <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="7" data-pack-target="create">7 วัน</button>
+                      <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="30" data-pack-target="create">30 วัน</button>
+                      <button type="button" class="btn btn-ghost btn-sm pack-btn pack-trial" data-pack-hours="1" data-pack-free-trial="1" data-pack-target="create">ทดลอง 1 ชม.</button>
+                      <button type="button" class="btn btn-ghost btn-sm pack-btn pack-permanent" data-pack-permanent="1" data-pack-target="create">ถาวร</button>
+                    </div>
+                    <div class="grid-3">
+                      <label class="field"><span>วัน</span><input id="create-days" type="number" min="0" max="3650" value="1" /></label>
+                      <label class="field"><span>ชม.</span><input id="create-hours" type="number" min="0" max="23" value="0" /></label>
+                      <label class="field"><span>นาที</span><input id="create-minutes" type="number" min="0" max="59" value="0" /></label>
+                    </div>
                   </div>
-                </div>
+                  <button class="btn btn-primary" type="submit" id="create-btn">สร้างผู้ใช้</button>
+                  <p id="create-status" class="status muted" role="status"></p>
+                </form>
+              </div>
+
+              <div id="cashier-tab-extend" class="cashier-tab panel" role="tabpanel" hidden>
+                <form id="extend-lookup-form" class="inline-row">
+                  <label class="field grow">
+                    <span>ชื่อผู้ใช้</span>
+                    <input id="extend-q" type="text" required spellcheck="false" autocomplete="off" />
+                  </label>
+                  <button class="btn btn-ghost" type="submit">ค้นหา</button>
+                </form>
+                <div id="extend-result" class="lookup-box muted">—</div>
+                <form id="extend-form">
+                  <label class="toggle-field">
+                    <input type="checkbox" id="extend-permanent" />
+                    <span>ตั้งเป็นถาวร</span>
+                  </label>
+                  <div id="extend-duration-block" class="duration-block" data-free-trial="0">
+                    <div class="pack-row pack-row-wide">
+                      <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="1" data-pack-target="extend">+1 วัน</button>
+                      <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="7" data-pack-target="extend">+7 วัน</button>
+                      <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="30" data-pack-target="extend">+30 วัน</button>
+                      <button type="button" class="btn btn-ghost btn-sm pack-btn pack-trial" data-pack-hours="1" data-pack-free-trial="1" data-pack-target="extend">ทดลอง 1 ชม.</button>
+                      <button type="button" class="btn btn-ghost btn-sm pack-btn pack-permanent" data-pack-permanent="1" data-pack-target="extend">ถาวร</button>
+                    </div>
+                    <div class="grid-3">
+                      <label class="field"><span>วัน</span><input id="extend-days" type="number" min="0" max="3650" value="1" /></label>
+                      <label class="field"><span>ชม.</span><input id="extend-hours" type="number" min="0" max="23" value="0" /></label>
+                      <label class="field"><span>นาที</span><input id="extend-minutes" type="number" min="0" max="59" value="0" /></label>
+                    </div>
+                  </div>
+                  <div class="inline-row-actions">
+                    <button class="btn btn-primary" type="submit" id="extend-btn">ต่ออายุ</button>
+                    <button class="btn btn-danger" type="button" id="revoke-btn">ตัดสิทธิ์</button>
+                  </div>
+                  <p id="extend-status" class="status muted" role="status"></p>
+                </form>
+              </div>
+
+              <div id="cashier-tab-expires" class="cashier-tab panel" role="tabpanel" hidden>
+                <form id="expires-lookup-form" class="inline-row">
+                  <label class="field grow">
+                    <span>ชื่อผู้ใช้</span>
+                    <input id="expires-q" type="text" required spellcheck="false" autocomplete="off" />
+                  </label>
+                  <button class="btn btn-ghost" type="submit">ค้นหา</button>
+                </form>
+                <div id="expires-result" class="lookup-box muted">—</div>
                 <div class="custom-expiry-block">
                   <label class="field">
-                    <span>ตั้งวันหมดอายุเอง</span>
+                    <span>วันและเวลาหมดอายุ</span>
                     <input id="extend-expires-at" type="datetime-local" />
                   </label>
-                  <button type="button" class="btn btn-ghost" id="set-expires-btn">ตั้งวันหมดอายุ</button>
+                  <button type="button" class="btn btn-primary" id="set-expires-btn">ตั้งวันหมดอายุ</button>
                 </div>
-                <div class="inline-row-actions">
-                  <button class="btn btn-primary" type="submit" id="extend-btn">ต่ออายุ</button>
-                  <button class="btn btn-danger" type="button" id="revoke-btn">ตัดสิทธิ์</button>
-                </div>
-                <p id="extend-status" class="status muted" role="status"></p>
-              </form>
+                <p id="expires-status" class="status muted" role="status"></p>
+              </div>
             </div>
 
-          </div>
-
-          <aside class="panel receipt-panel" aria-live="polite">
-            <div class="panel-title-row">
-              <img class="panel-title-icon" src="assets_web/coin.png" alt="" width="28" height="28" />
+            <aside class="panel receipt-panel" aria-live="polite">
               <h3>ใบเสร็จล่าสุด</h3>
-            </div>
-            <div id="receipt-box" class="receipt-box muted">ยังไม่มีรายการในรอบนี้</div>
-          </aside>
-        </div>
-      </section>
+              <div id="receipt-box" class="receipt-box muted">ยังไม่มีรายการในรอบนี้</div>
+            </aside>
+          </div>
+        </section>
 
-      <!-- SYSTEM -->
-      <section id="view-system" class="pos-view" data-panel="system">
-        <div class="view-head">
-          <h2>ระบบ</h2>
-        </div>
-        <div class="system-grid">
-          <div class="panel">
-            <h3>ปิดปรับปรุง</h3>
-            <div class="settings-row">
-              <label class="toggle-field">
-                <input type="checkbox" id="set-farm-maint" />
-                <span>ปิดฟาร์ม</span>
-              </label>
-              <label class="toggle-field">
-                <input type="checkbox" id="set-topup-maint" />
-                <span>ปิดเติมเงิน</span>
-              </label>
-              <button type="button" class="btn btn-primary" id="save-settings-btn">บันทึก</button>
+        <!-- SYSTEM -->
+        <section id="view-system" class="pos-view" data-panel="system">
+          <div class="view-head"><h2>ระบบ</h2></div>
+          <div class="system-grid">
+            <div class="panel">
+              <h3>ปิดปรับปรุง</h3>
+              <div class="settings-row">
+                <label class="toggle-field"><input type="checkbox" id="set-farm-maint" /><span>ปิดฟาร์ม</span></label>
+                <label class="toggle-field"><input type="checkbox" id="set-topup-maint" /><span>ปิดเติมเงิน</span></label>
+                <button type="button" class="btn btn-primary btn-sm" id="save-settings-btn">บันทึก</button>
+              </div>
+              <p id="settings-status" class="status muted" role="status"></p>
             </div>
-            <p id="settings-status" class="status muted" role="status"></p>
-          </div>
-          <div class="panel mode-web-only">
-            <div class="panel-head-row">
-              <h3>เติมค้าง / ตามมือ</h3>
-              <button type="button" class="btn btn-ghost btn-sm" id="refresh-stuck-btn">รีเฟรช</button>
+            <div class="panel mode-web-only">
+              <div class="panel-head-row">
+                <h3>เติมค้าง / ตามมือ</h3>
+                <button type="button" class="btn btn-ghost btn-sm" id="refresh-stuck-btn">รีเฟรช</button>
+              </div>
+              <div id="stuck-topups" class="admin-list muted">กำลังโหลด…</div>
             </div>
-            <div id="stuck-topups" class="admin-list muted">กำลังโหลด…</div>
-          </div>
-          <div class="panel">
-            <div class="panel-head-row">
-              <h3>บันทึกการกระทำ</h3>
-              <button type="button" class="btn btn-ghost btn-sm" id="refresh-audit-btn">รีเฟรช</button>
+            <div class="panel panel-wide">
+              <div class="panel-head-row">
+                <h3>บันทึกการกระทำ</h3>
+                <button type="button" class="btn btn-ghost btn-sm" id="refresh-audit-btn">รีเฟรช</button>
+              </div>
+              <div class="audit-toolbar">
+                <input id="audit-search" type="search" placeholder="ค้นหา action / user id…" spellcheck="false" />
+                <select id="audit-filter" class="select-input">
+                  <option value="all">ทุก action</option>
+                  <option value="rental">เช่า / ต่ออายุ</option>
+                  <option value="topup">เติมเงิน</option>
+                  <option value="ban">แบน / ปลดแบน</option>
+                  <option value="user">สร้าง / ลบ user</option>
+                </select>
+              </div>
+              <div id="audit-list" class="admin-list muted">กำลังโหลด…</div>
             </div>
-            <div id="audit-list" class="admin-list muted">กำลังโหลด…</div>
           </div>
-        </div>
-      </section>
+        </section>
+
+      </div>
     </div>
+
+    <!-- USER DRAWER -->
+    <aside id="user-drawer" class="user-drawer hidden" aria-hidden="true">
+      <button type="button" class="drawer-backdrop" id="drawer-backdrop" aria-label="ปิด"></button>
+      <div class="drawer-panel" role="dialog" aria-labelledby="drawer-title">
+        <div class="drawer-head">
+          <h3 id="drawer-title">รายละเอียดผู้ใช้</h3>
+          <button type="button" id="drawer-close" class="btn btn-ghost btn-sm" aria-label="ปิด">ปิด</button>
+        </div>
+        <div id="drawer-body" class="drawer-body muted">—</div>
+        <div id="drawer-actions" class="drawer-actions"></div>
+      </div>
+    </aside>
   </div>
 
   <div id="modal-root" class="modal-root hidden" aria-hidden="true">
     <div class="modal-backdrop"></div>
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <button type="button" id="modal-close" class="modal-close" aria-label="ปิด">×</button>
-      <img id="modal-icon" class="modal-icon" src="assets/coin.png" alt="" width="48" height="48" />
       <h2 id="modal-title" class="modal-title">—</h2>
       <div id="modal-body" class="modal-body">—</div>
       <div id="modal-actions" class="modal-actions"></div>
@@ -312,7 +363,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./config.js?v=20260730-rental2"></script>
-  <script src="./app.js?v=20260730-rental2"></script>
+  <script src="./config.js?v=20260730-ui3"></script>
+  <script src="./app.js?v=20260730-ui3"></script>
 </body>
 </html>
