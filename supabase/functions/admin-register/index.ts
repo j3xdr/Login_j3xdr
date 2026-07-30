@@ -21,7 +21,7 @@ const corsHeaders: Record<string, string> = {
 
 const SYNTHETIC_EMAIL_DOMAIN = "users.ckr.local";
 
-type Action = "create" | "extend" | "revoke" | "make_permanent";
+type Action = "create" | "extend" | "revoke" | "make_permanent" | "set_expires";
 
 type Body = {
   action?: string;
@@ -34,6 +34,7 @@ type Body = {
   seconds?: number;
   permanent?: boolean;
   role?: string;
+  expires_at?: string;
 };
 
 function json(body: unknown, status = 200) {
@@ -92,6 +93,7 @@ function parseAction(raw: string | undefined): Action {
   if (a === "extend" || a === "renew") return "extend";
   if (a === "revoke" || a === "expire") return "revoke";
   if (a === "make_permanent" || a === "permanent") return "make_permanent";
+  if (a === "set_expires" || a === "set_expire") return "set_expires";
   return "create";
 }
 
@@ -154,11 +156,57 @@ Deno.serve(async (req: Request) => {
   const duration = parseDuration(body);
   const role = body.role === "admin" ? "admin" : "normal";
 
-  // ---------- EXTEND / REVOKE / MAKE_PERMANENT ----------
+  // ---------- EXTEND / REVOKE / MAKE_PERMANENT / SET_EXPIRES ----------
   if (action !== "create") {
     const query = usernameRaw || emailRaw;
     if (!query || query.length < 2) {
       return json({ ok: false, error: "username_required" }, 400);
+    }
+
+    if (action === "set_expires") {
+      const expiresRaw = String(body.expires_at || "").trim();
+      if (!expiresRaw) {
+        return json({ ok: false, error: "expires_at_required" }, 400);
+      }
+      const exp = new Date(expiresRaw);
+      if (Number.isNaN(exp.getTime())) {
+        return json({ ok: false, error: "invalid_expires_at" }, 400);
+      }
+      if (exp.getTime() <= Date.now()) {
+        return json({ ok: false, error: "expires_must_be_future" }, 400);
+      }
+
+      const { data: looked, error: lookErr } = await adminClient.rpc(
+        "admin_lookup_user",
+        { p_query: query },
+      );
+      const lookup = looked as Record<string, unknown> | null;
+      if (lookErr || !lookup || lookup.ok !== true) {
+        return json({ ok: false, error: "user_not_found" }, 404);
+      }
+
+      const { data: updated, error: updErr } = await adminClient
+        .from("profiles")
+        .update({
+          is_permanent: false,
+          expires_at: exp.toISOString(),
+        })
+        .eq("id", lookup.id)
+        .select("id, username, is_permanent, expires_at")
+        .single();
+
+      if (updErr || !updated) {
+        return json(
+          { ok: false, error: "set_expires_failed", detail: updErr?.message },
+          500,
+        );
+      }
+
+      return json({
+        ok: true,
+        action: "set_expires",
+        user: updated,
+      });
     }
 
     const { data: rpcData, error: rpcErr } = await adminClient.rpc(

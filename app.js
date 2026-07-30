@@ -1,4 +1,4 @@
-/* CKR Admin Console — POS dashboard (day rental + tokens) */
+/* CKR Admin Console — POS dashboard (PC + Web rental days) */
 (function () {
   "use strict";
 
@@ -122,7 +122,14 @@
   let apiReady = false;
   let modalMode = null;
   let modalResolver = null;
-  let adminMode = localStorage.getItem(MODE_KEY) === "token" ? "token" : "day";
+  let adminMode = (() => {
+    try {
+      const m = localStorage.getItem(MODE_KEY);
+      return m === "web" || m === "token" ? "web" : "day";
+    } catch (_) {
+      return "day";
+    }
+  })();
   let currentView = "overview";
   let cachedUsers = [];
   let lastStats = null;
@@ -367,6 +374,36 @@
     return (d.days || 0) > 0 || (d.hours || 0) > 0 || (d.minutes || 0) > 0;
   }
 
+  function readFreeTrial(prefix) {
+    const block = $(prefix + "-duration-block");
+    return block?.dataset?.freeTrial === "1";
+  }
+
+  function setFreeTrial(prefix, on) {
+    const block = $(prefix + "-duration-block");
+    if (block) block.dataset.freeTrial = on ? "1" : "0";
+  }
+
+  function parseDatetimeLocal(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    if (d.getTime() <= Date.now()) {
+      throw new Error("วันหมดอายุต้องอยู่ในอนาคต");
+    }
+    return d.toISOString();
+  }
+
+  async function resolveUserId(username, userId) {
+    if (userId) return userId;
+    if (!username) throw new Error("user_required");
+    const looked = await api("/api/admin/lookup?q=" + encodeURIComponent(username));
+    if (!looked?.ok || !looked.id) {
+      throw new Error(looked?.reason || "ไม่พบผู้ใช้");
+    }
+    return looked.id;
+  }
+
   function formatRemaining(expiresAt) {
     if (!expiresAt) return "—";
     const exp = new Date(expiresAt);
@@ -384,6 +421,22 @@
     return "เหลือ " + parts.join(" ");
   }
 
+  function expiryAt(u) {
+    if (!u) return null;
+    if (adminMode === "web") return u.rental_expires_at ?? u.expires_at ?? null;
+    return u.expires_at ?? u.rental_expires_at ?? null;
+  }
+
+  function enrichUser(row) {
+    if (!row) return row;
+    const cached = cachedUsers.find(
+      (u) =>
+        (row.id && u.id === row.id) ||
+        (row.username && u.username && u.username === row.username)
+    );
+    return cached ? { ...row, ...cached } : row;
+  }
+
   function rentalStatus(u) {
     if (u.banned_at) {
       return { kind: "banned", label: "ถูกแบน", detail: formatDay(u.banned_at) };
@@ -391,17 +444,18 @@
     if (u.is_permanent) {
       return { kind: "permanent", label: "ถาวร", detail: "ไม่หมดอายุ" };
     }
-    if (!u.expires_at) {
+    const expires = expiryAt(u);
+    if (!expires) {
       return { kind: "unset", label: "ยังไม่ตั้งวัน", detail: "—" };
     }
-    const exp = new Date(u.expires_at);
+    const exp = new Date(expires);
     if (Number.isNaN(exp.getTime()) || exp.getTime() <= Date.now()) {
-      return { kind: "expired", label: "หมดอายุ", detail: formatDay(u.expires_at) };
+      return { kind: "expired", label: "หมดอายุ", detail: formatDay(expires) };
     }
     return {
       kind: "active",
-      label: formatRemaining(u.expires_at),
-      detail: "หมด " + formatDay(u.expires_at),
+      label: formatRemaining(expires),
+      detail: "หมด " + formatDay(expires),
     };
   }
 
@@ -484,6 +538,158 @@
     return data;
   }
 
+  async function applyRentalChange({
+    username,
+    userId,
+    permanent,
+    duration,
+    revoke,
+    freeTrial,
+  }) {
+    if (adminMode === "day") {
+      if (revoke) {
+        return invokeAdminRental({ action: "revoke", username });
+      }
+      if (permanent) {
+        return invokeAdminRental({ action: "make_permanent", username, permanent: true });
+      }
+      return invokeAdminRental({
+        action: "extend",
+        username,
+        days: duration.days,
+        hours: duration.hours,
+        minutes: duration.minutes,
+      });
+    }
+
+    const uid = await resolveUserId(username, userId);
+
+    if (revoke) {
+      const out = await api("/api/admin/rental/set-expires", {
+        method: "POST",
+        body: { user_id: uid, rental_expires_at: null },
+      });
+      return {
+        user: {
+          id: uid,
+          username,
+          rental_expires_at: null,
+          is_permanent: false,
+          ...out,
+        },
+      };
+    }
+
+    if (permanent) {
+      const out = await api("/api/admin/rental/set-permanent", {
+        method: "POST",
+        body: { user_id: uid, permanent: true },
+      });
+      return {
+        user: {
+          id: uid,
+          username,
+          is_permanent: true,
+          rental_expires_at: out.rental_expires_at ?? null,
+        },
+      };
+    }
+
+    const body = {
+      user_id: uid,
+      reason: freeTrial ? "free_trial" : "admin_grant",
+    };
+    if (duration.days > 0) {
+      if (duration.hours > 0 || duration.minutes > 0) {
+        throw new Error("โหมด Web ใส่ได้เฉพาะวัน หรือ ชม. (อย่างใดอย่างหนึ่ง)");
+      }
+      body.days = duration.days;
+    } else {
+      const totalHours = duration.hours + (duration.minutes > 0 ? 1 : 0);
+      if (totalHours < 1) throw new Error("ต้องระบุอย่างน้อย 1 วัน หรือ 1 ชม.");
+      body.hours = Math.min(8760, totalHours);
+    }
+
+    const out = await api("/api/admin/rental/grant", { method: "POST", body });
+    return {
+      user: {
+        id: uid,
+        username,
+        rental_expires_at: out.rental_expires_at,
+        is_permanent: !!out.is_permanent,
+      },
+    };
+  }
+
+  async function setRentalExpiresAt({ username, userId, expiresAtIso }) {
+    if (!expiresAtIso) throw new Error("expires_at_required");
+
+    if (adminMode === "day") {
+      const data = await invokeAdminRental({
+        action: "set_expires",
+        username,
+        expires_at: expiresAtIso,
+      });
+      return { user: data.user || { username, expires_at: expiresAtIso } };
+    }
+
+    const uid = await resolveUserId(username, userId);
+    const out = await api("/api/admin/rental/set-expires", {
+      method: "POST",
+      body: { user_id: uid, rental_expires_at: expiresAtIso },
+    });
+    return {
+      user: {
+        id: uid,
+        username,
+        rental_expires_at: out.rental_expires_at ?? expiresAtIso,
+        is_permanent: false,
+      },
+    };
+  }
+
+  async function createAccount({ username, password, permanent, duration, freeTrial }) {
+    if (adminMode === "day") {
+      return invokeAdminRental({
+        action: "create",
+        username,
+        password,
+        permanent,
+        days: duration.days,
+        hours: duration.hours,
+        minutes: duration.minutes,
+      });
+    }
+
+    const created = await api("/api/admin/create-user", {
+      method: "POST",
+      body: { username, password, initial_tokens: 0 },
+    });
+    const uid = created.id;
+    let user = {
+      id: uid,
+      username: created.username || username,
+      is_permanent: false,
+      rental_expires_at: null,
+    };
+    if (permanent || hasDuration(duration)) {
+      const out = await applyRentalChange({
+        userId: uid,
+        username,
+        permanent,
+        duration,
+        freeTrial,
+      });
+      user = out.user || user;
+    }
+    return { ok: true, action: "create", user };
+  }
+
+  function rentalReceiptExpiry(u) {
+    const exp = expiryAt(u);
+    return exp ? formatDay(exp) : "ถาวร";
+  }
+
   async function invokeAdminRental(body) {
     const { data, error } = await sb.functions.invoke(EDGE_ADMIN_FN, { body });
     if (error) {
@@ -534,22 +740,28 @@
 
   /* ---- Mode / View ---- */
   function setMode(mode) {
-    adminMode = mode === "token" ? "token" : "day";
+    adminMode = mode === "web" || mode === "token" ? "web" : "day";
     try {
       localStorage.setItem(MODE_KEY, adminMode);
     } catch (_) {}
     dash?.classList.toggle("mode-day", adminMode === "day");
-    dash?.classList.toggle("mode-token", adminMode === "token");
+    dash?.classList.toggle("mode-web", adminMode === "web");
     $("mode-day")?.classList.toggle("is-active", adminMode === "day");
-    $("mode-token")?.classList.toggle("is-active", adminMode === "token");
+    $("mode-web")?.classList.toggle("is-active", adminMode === "web");
     const hint =
-      adminMode === "day" ? "โหมด: เติมวัน (PC)" : "โหมด: เติมโทเค็น (Web)";
+      adminMode === "day" ? "โหมด: เช่าวัน (PC)" : "โหมด: เช่าวัน (Web)";
     if ($("overview-mode-hint")) $("overview-mode-hint").textContent = hint;
     if ($("cashier-mode-hint")) {
       $("cashier-mode-hint").textContent =
-        adminMode === "day" ? "เปิดสิทธิ์วันใช้งาน" : "เติมโทเค็นเว็บ";
+        adminMode === "day"
+          ? "เปิดสิทธิ์วันใช้งาน (PC)"
+          : "เปิดสิทธิ์วันใช้งาน (Web)";
     }
-    renderUsers(cachedUsers);
+    if ($("kpi-extra-label")) {
+      $("kpi-extra-label").textContent =
+        adminMode === "web" ? "เติมเงินวันนี้" : "เติมเงิน (Web)";
+    }
+    loadUsers();
     paintKpis();
   }
 
@@ -575,11 +787,12 @@
     if ($("kpi-users")) $("kpi-users").textContent = String(total);
     if ($("kpi-active")) $("kpi-active").textContent = String(active);
     if ($("kpi-expired")) $("kpi-expired").textContent = String(expired);
-    if ($("kpi-tokens")) {
-      $("kpi-tokens").textContent =
-        lastStats && lastStats.tokens_credited != null
-          ? "+" + String(lastStats.tokens_credited)
-          : "—";
+    if ($("kpi-extra")) {
+      if (adminMode === "web" && lastStats) {
+        $("kpi-extra").textContent = String(lastStats.topups ?? "—");
+      } else {
+        $("kpi-extra").textContent = "—";
+      }
     }
   }
 
@@ -601,14 +814,15 @@
         .map((row) => {
           const id = escapeHtml(row.id || "");
           const baht = Number(row.amount_baht ?? 0);
-          const tokens = escapeHtml(row.tokens_credited || row.package_tokens || "—");
+          const days =
+            row.days_credited || row.package_days || row.package_tokens || row.tokens_credited || "—";
           return (
             '<div class="admin-row" data-redemption-id="' +
             id +
             '">' +
             '<div class="admin-row-head"><strong>' +
-            tokens +
-            " โทเค็น · " +
+            escapeHtml(days) +
+            " วัน · " +
             escapeHtml(baht) +
             "฿</strong>" +
             '<button type="button" class="btn btn-primary btn-sm" data-action="credit-retry">เครดิตซ้ำ</button></div>' +
@@ -678,14 +892,13 @@
         escapeHtml(runs.succeeded || 0) +
         " · ล้ม " +
         escapeHtml(runs.failed || 0) +
-        ")<br>โทเค็นเติม: +" +
-        escapeHtml(data.tokens_credited || 0) +
-        " · ใช้ไป: -" +
-        escapeHtml(data.tokens_consumed || 0) +
-        "<br>เติมเงิน: " +
-        escapeHtml(data.topups || 0) +
-        " · ตามมือ: " +
-        escapeHtml(data.topups_needs_manual || 0);
+        ")" +
+        (adminMode === "web"
+          ? "<br>เติมเงิน: " +
+            escapeHtml(data.topups || 0) +
+            " · ตามมือ: " +
+            escapeHtml(data.topups_needs_manual || 0)
+          : "");
       paintKpis();
     } catch (e) {
       root.textContent = e.message || String(e);
@@ -705,13 +918,8 @@
     const body = $("users-body");
     if (!thead || !body) return;
 
-    if (adminMode === "day") {
-      thead.innerHTML =
-        "<tr><th>ชื่อผู้ใช้</th><th>บทบาท</th><th>สถานะเช่า</th><th>รายละเอียด</th><th>การทำงาน</th></tr>";
-    } else {
-      thead.innerHTML =
-        "<tr><th>ชื่อผู้ใช้</th><th>บทบาท</th><th>โทเค็น</th><th>สถานะ</th><th>การทำงาน</th></tr>";
-    }
+    thead.innerHTML =
+      "<tr><th>ชื่อผู้ใช้</th><th>บทบาท</th><th>สถานะเช่า</th><th>รายละเอียด</th><th>การทำงาน</th></tr>";
 
     if (!users.length) {
       body.innerHTML =
@@ -730,44 +938,23 @@
         const banned = !!u.banned_at;
         const canMutate = !isSelf && !isAdmin;
         const st = rentalStatus(u);
-        const bal = Number(u.token_balance ?? 0);
 
-        let midCols = "";
-        if (adminMode === "day") {
-          midCols =
-            '<td data-label="สถานะเช่า"><span class="tag tag-' +
-            st.kind +
-            '">' +
-            escapeHtml(st.label) +
-            '</span></td><td data-label="รายละเอียด" class="muted">' +
-            escapeHtml(st.detail) +
-            "</td>";
-        } else {
-          midCols =
-            '<td data-label="โทเค็น"><strong>' +
-            escapeHtml(bal) +
-            '</strong></td><td data-label="สถานะ"><span class="tag tag-' +
-            st.kind +
-            '">' +
-            escapeHtml(st.label) +
-            "</span></td>";
-        }
+        const midCols =
+          '<td data-label="สถานะเช่า"><span class="tag tag-' +
+          st.kind +
+          '">' +
+          escapeHtml(st.label) +
+          '</span></td><td data-label="รายละเอียด" class="muted">' +
+          escapeHtml(st.detail) +
+          "</td>";
 
         const actions = [];
-        if (adminMode === "day" && canMutate) {
+        if (canMutate) {
           actions.push(
             '<button type="button" class="btn btn-primary btn-sm" data-action="quick-extend">ต่ออายุ</button>'
           );
           actions.push(
             '<button type="button" class="btn btn-ghost btn-sm" data-action="make-permanent">ถาวร</button>'
-          );
-        }
-        if (adminMode === "token" && canMutate) {
-          actions.push(
-            '<button type="button" class="btn btn-primary btn-sm" data-action="credit-row">เติม</button>'
-          );
-          actions.push(
-            '<button type="button" class="btn btn-ghost btn-sm" data-action="set-tokens-row">ตั้งยอด</button>'
           );
         }
         if (canMutate) {
@@ -792,8 +979,6 @@
           id +
           '" data-username="' +
           unameAttr +
-          '" data-tokens="' +
-          escapeHtml(bal) +
           '"><td data-label="ชื่อผู้ใช้"><strong class="user-name">' +
           name +
           '</strong></td><td data-label="บทบาท"><span class="tag tag-role">' +
@@ -817,10 +1002,12 @@
     }
     try {
       let users = null;
-      try {
-        const { data, error } = await sb.rpc("admin_list_profiles");
-        if (!error && Array.isArray(data)) users = data;
-      } catch (_) {}
+      if (adminMode === "day") {
+        try {
+          const { data, error } = await sb.rpc("admin_list_profiles");
+          if (!error && Array.isArray(data)) users = data;
+        } catch (_) {}
+      }
       if (!users) {
         const data = await api("/api/admin/users");
         users = data.users || [];
@@ -950,22 +1137,17 @@
     }
     setStatus(listStatus, "กำลังต่ออายุ…", "muted");
     try {
-      const data = await invokeAdminRental({
-        action: "extend",
-        username,
-        days,
-        hours: 0,
-        minutes: 0,
-      });
+      const data = await applyRentalChange({ username, duration: { days, hours: 0, minutes: 0 } });
+      const u = data.user || {};
       setStatus(
         listStatus,
-        "ต่ออายุแล้ว · หมด " + formatDay(data.user?.expires_at),
+        "ต่ออายุแล้ว · หมด " + rentalReceiptExpiry(u),
         "ok"
       );
       paintReceipt([
         "ต่ออายุ",
-        "User: " + (data.user?.username || username),
-        "หมดอายุ: " + formatDay(data.user?.expires_at),
+        "User: " + (u.username || username),
+        "หมดอายุ: " + rentalReceiptExpiry(u),
       ]);
       await loadUsers();
     } catch (err) {
@@ -987,58 +1169,10 @@
     });
     if (!confirmed) return;
     try {
-      await invokeAdminRental({
-        action: "make_permanent",
-        username,
-        permanent: true,
-      });
+      await applyRentalChange({ username, permanent: true });
       setStatus(listStatus, "ตั้งถาวรแล้ว: " + name, "ok");
       paintReceipt(["ตั้งถาวร", "User: " + name, "สถานะ: ถาวร"]);
       await loadUsers();
-    } catch (err) {
-      setStatus(listStatus, err.message || String(err), "err");
-    }
-  }
-
-  async function creditRow(row) {
-    const username = row.getAttribute("data-username") || "";
-    if (!username) return;
-    showView("cashier");
-    setMode("token");
-    if ($("credit-q")) $("credit-q").value = username;
-    if ($("lookup-q")) $("lookup-q").value = username;
-    $("lookup-form")?.requestSubmit();
-  }
-
-  async function setTokensRow(row) {
-    const userId = row.getAttribute("data-user-id");
-    const name = row.querySelector(".user-name")?.textContent || userId;
-    const orig = Number(row.getAttribute("data-tokens") || 0);
-    const listStatus = $("list-status");
-    const nextRaw = await showPromptModal({
-      title: "ตั้งยอดโทเค็น",
-      body: 'ยอดใหม่ของ "' + name + '" (เดิม ' + orig + ")",
-      placeholder: "จำนวนโทเค็น",
-      defaultValue: String(orig),
-      confirmLabel: "บันทึก",
-      cancelLabel: "ยกเลิก",
-      icon: "assets/coin.png",
-    });
-    if (nextRaw === null) return;
-    const next = Math.max(0, Math.min(1_000_000, Number(nextRaw) || 0));
-    setStatus(listStatus, "กำลังบันทึก…", "muted");
-    try {
-      const data = await api("/api/admin/set-tokens", {
-        method: "POST",
-        body: { user_id: userId, token_balance: next, reason: "admin_set" },
-      });
-      setStatus(listStatus, "ยอดใหม่: " + (data.token_balance ?? next), "ok");
-      paintReceipt([
-        "ตั้งยอดโทเค็น",
-        "User: " + name,
-        "ยอด: " + (data.token_balance ?? next),
-      ]);
-      await Promise.all([loadUsers(), loadAudit()]);
     } catch (err) {
       setStatus(listStatus, err.message || String(err), "err");
     }
@@ -1050,7 +1184,7 @@
   });
 
   $("mode-day")?.addEventListener("click", () => setMode("day"));
-  $("mode-token")?.addEventListener("click", () => setMode("token"));
+  $("mode-web")?.addEventListener("click", () => setMode("web"));
 
   $("users-body")?.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-action]");
@@ -1063,8 +1197,6 @@
     if (action === "unban-user") unbanUser(row);
     if (action === "quick-extend") quickExtendUser(row);
     if (action === "make-permanent") makePermanentUser(row);
-    if (action === "credit-row") creditRow(row);
-    if (action === "set-tokens-row") setTokensRow(row);
   });
 
   $("login-form")?.addEventListener("submit", async (e) => {
@@ -1145,7 +1277,7 @@
     if (!id) return;
     const confirmed = await showConfirmModal({
       title: "เครดิตซ้ำ?",
-      body: "ยืนยันเครดิตโทเค็นสำหรับรายการค้างนี้",
+      body: "ยืนยันเติมวันเช่าให้รายการค้างนี้",
       confirmLabel: "เครดิตซ้ำ",
       cancelLabel: "ยกเลิก",
       icon: "assets/coin.png",
@@ -1169,26 +1301,41 @@
     }
   });
 
-  $("create-permanent")?.addEventListener("change", () =>
-    syncDurationVisibility("create")
-  );
-  $("extend-permanent")?.addEventListener("change", () =>
-    syncDurationVisibility("extend")
-  );
+  $("create-permanent")?.addEventListener("change", () => {
+    if ($("create-permanent")?.checked) setFreeTrial("create", false);
+    syncDurationVisibility("create");
+  });
+  $("extend-permanent")?.addEventListener("change", () => {
+    if ($("extend-permanent")?.checked) setFreeTrial("extend", false);
+    syncDurationVisibility("extend");
+  });
   syncDurationVisibility("create");
   syncDurationVisibility("extend");
 
   document.querySelectorAll(".pack-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const days = Math.max(0, Number(btn.getAttribute("data-pack-days")) || 0);
       const target = btn.getAttribute("data-pack-target") || "create";
       const permanentEl = $(target + "-permanent");
+
+      if (btn.getAttribute("data-pack-permanent") === "1") {
+        if (permanentEl) permanentEl.checked = true;
+        setFreeTrial(target, false);
+        syncDurationVisibility(target);
+        return;
+      }
+
       if (permanentEl) {
         permanentEl.checked = false;
         syncDurationVisibility(target);
       }
+
+      const days = Math.max(0, Number(btn.getAttribute("data-pack-days")) || 0);
+      const hours = Math.max(0, Number(btn.getAttribute("data-pack-hours")) || 0);
+      const isTrial = btn.getAttribute("data-pack-free-trial") === "1";
+      setFreeTrial(target, isTrial);
+
       if ($(target + "-days")) $(target + "-days").value = String(days);
-      if ($(target + "-hours")) $(target + "-hours").value = "0";
+      if ($(target + "-hours")) $(target + "-hours").value = String(hours || (isTrial ? 1 : 0));
       if ($(target + "-minutes")) $(target + "-minutes").value = "0";
     });
   });
@@ -1202,17 +1349,16 @@
       const password = $("create-pass").value;
       const permanent = !!$("create-permanent")?.checked;
       const duration = readDuration("create");
+      const freeTrial = readFreeTrial("create");
       if (!permanent && !hasDuration(duration)) {
         throw new Error("ระบุวัน / ชม. / นาที หรือเลือกถาวร");
       }
-      const data = await invokeAdminRental({
-        action: "create",
+      const data = await createAccount({
         username,
         password,
         permanent,
-        days: duration.days,
-        hours: duration.hours,
-        minutes: duration.minutes,
+        duration,
+        freeTrial,
       });
       const u = data.user || {};
       const st = rentalStatus(u);
@@ -1225,12 +1371,13 @@
         "สร้างผู้ใช้",
         "User: " + (u.username || username),
         "สถานะ: " + st.label,
-        u.expires_at ? "หมดอายุ: " + formatDay(u.expires_at) : "ถาวร",
+        (freeTrial ? "แพ็ก: ทดลอง 1 ชม." : "หมดอายุ: " + rentalReceiptExpiry(u)),
       ]);
       $("create-form").reset();
       if ($("create-days")) $("create-days").value = "1";
       if ($("create-hours")) $("create-hours").value = "0";
       if ($("create-minutes")) $("create-minutes").value = "0";
+      setFreeTrial("create", false);
       syncDurationVisibility("create");
       await loadUsers();
     } catch (err) {
@@ -1250,13 +1397,16 @@
     }
     try {
       let row = null;
-      const { data, error } = await sb.rpc("admin_lookup_user", { p_query: q });
-      if (!error && data?.ok) row = data;
+      if (adminMode === "day") {
+        const { data, error } = await sb.rpc("admin_lookup_user", { p_query: q });
+        if (!error && data?.ok) row = data;
+      }
       if (!row) {
         const legacy = await api("/api/admin/lookup?q=" + encodeURIComponent(q));
         if (legacy?.ok) row = legacy;
         else throw new Error(legacy?.reason || "ไม่พบผู้ใช้");
       }
+      row = enrichUser(row);
       if (box) {
         box.className = "lookup-box";
         box.innerHTML = describeRentalUser(row);
@@ -1276,21 +1426,16 @@
       if (!username) throw new Error("ใส่ชื่อผู้ใช้ก่อน");
       const permanent = !!$("extend-permanent")?.checked;
       const duration = readDuration("extend");
+      const freeTrial = readFreeTrial("extend");
       if (!permanent && !hasDuration(duration)) {
         throw new Error("ระบุวัน / ชม. / นาที หรือตั้งถาวร");
       }
-      const data = await invokeAdminRental(
+      const data = await applyRentalChange(
         permanent
-          ? { action: "make_permanent", username, permanent: true }
-          : {
-              action: "extend",
-              username,
-              days: duration.days,
-              hours: duration.hours,
-              minutes: duration.minutes,
-            }
+          ? { username, permanent: true }
+          : { username, duration, freeTrial }
       );
-      const u = data.user || {};
+      const u = enrichUser(data.user || { username });
       const st = rentalStatus(u);
       setStatus(
         $("extend-status"),
@@ -1301,15 +1446,16 @@
         "ok"
       );
       paintReceipt([
-        permanent ? "ตั้งถาวร" : "ต่ออายุ",
+        permanent ? "ตั้งถาวร" : freeTrial ? "ทดลอง 1 ชม." : "ต่ออายุ",
         "User: " + (u.username || username),
         "สถานะ: " + st.label,
-        u.expires_at ? "หมดอายุ: " + formatDay(u.expires_at) : "ถาวร",
+        "หมดอายุ: " + rentalReceiptExpiry(u),
       ]);
       if ($("extend-result")) {
         $("extend-result").className = "lookup-box";
         $("extend-result").innerHTML = describeRentalUser(u);
       }
+      setFreeTrial("extend", false);
       await loadUsers();
     } catch (err) {
       setStatus($("extend-status"), err.message || String(err), "err");
@@ -1334,7 +1480,7 @@
     if (!confirmed) return;
     $("revoke-btn").disabled = true;
     try {
-      const data = await invokeAdminRental({ action: "revoke", username });
+      const data = await applyRentalChange({ username, revoke: true });
       const u = data.user || { username };
       setStatus($("extend-status"), "ตัดสิทธิ์แล้ว: " + (u.username || username), "ok");
       paintReceipt(["ตัดสิทธิ์", "User: " + (u.username || username)]);
@@ -1346,49 +1492,42 @@
     }
   });
 
-  $("lookup-form")?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const q = $("lookup-q").value.trim();
-    $("lookup-result").textContent = "กำลังค้นหา…";
-    try {
-      const data = await api("/api/admin/lookup?q=" + encodeURIComponent(q));
-      if (!data.ok) {
-        $("lookup-result").textContent = data.reason || "ไม่พบผู้ใช้";
-        return;
-      }
-      $("lookup-result").innerHTML =
-        "<strong>" +
-        escapeHtml(data.username || q) +
-        "</strong> · โทเค็น: " +
-        escapeHtml(data.token_balance) +
-        " · บทบาท: " +
-        escapeHtml(data.role);
-      $("credit-q").value = data.username || q;
-    } catch (err) {
-      $("lookup-result").textContent = err.message;
+  $("set-expires-btn")?.addEventListener("click", async () => {
+    const username = $("extend-q")?.value.trim();
+    if (!username) {
+      setStatus($("extend-status"), "ใส่ชื่อผู้ใช้ก่อน", "err");
+      return;
     }
-  });
-
-  $("credit-form")?.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    setStatus($("credit-status"), "กำลังเติมโทเค็น…", "muted");
+    $("set-expires-btn").disabled = true;
+    setStatus($("extend-status"), "กำลังตั้งวันหมดอายุ…", "muted");
     try {
-      const q = $("credit-q").value.trim();
-      const amt = Number($("credit-amt").value) || 0;
-      const data = await api("/api/admin/add-tokens", {
-        method: "POST",
-        body: { query: q, amount: amt, reason: "admin_credit" },
-      });
-      setStatus($("credit-status"), "ยอดใหม่: " + data.token_balance, "ok");
+      const expiresAtIso = parseDatetimeLocal($("extend-expires-at")?.value);
+      if (!expiresAtIso) throw new Error("เลือกวันและเวลาหมดอายุ");
+      const data = await setRentalExpiresAt({ username, expiresAtIso });
+      const u = enrichUser(data.user || { username });
+      const st = rentalStatus(u);
+      setStatus(
+        $("extend-status"),
+        "ตั้งหมดอายุแล้ว: " + (u.username || username) + " · " + st.label,
+        "ok"
+      );
       paintReceipt([
-        "เติมโทเค็น",
-        "User: " + q,
-        "เพิ่ม: +" + amt,
-        "ยอดใหม่: " + data.token_balance,
+        "ตั้งวันหมดอายุ",
+        "User: " + (u.username || username),
+        "หมดอายุ: " + rentalReceiptExpiry(u),
       ]);
-      await Promise.all([loadUsers(), loadAudit(), loadStats()]);
+      if ($("extend-result")) {
+        $("extend-result").className = "lookup-box";
+        $("extend-result").innerHTML = describeRentalUser(u);
+      }
+      if ($("extend-permanent")) $("extend-permanent").checked = false;
+      setFreeTrial("extend", false);
+      syncDurationVisibility("extend");
+      await loadUsers();
     } catch (err) {
-      setStatus($("credit-status"), err.message, "err");
+      setStatus($("extend-status"), err.message || String(err), "err");
+    } finally {
+      $("set-expires-btn").disabled = false;
     }
   });
 
@@ -1397,13 +1536,8 @@
     const q = $("quick-search").value.trim();
     if (!q) return;
     showView("cashier");
-    if (adminMode === "day") {
-      if ($("extend-q")) $("extend-q").value = q;
-      $("extend-lookup-form")?.requestSubmit();
-    } else {
-      if ($("lookup-q")) $("lookup-q").value = q;
-      $("lookup-form")?.requestSubmit();
-    }
+    if ($("extend-q")) $("extend-q").value = q;
+    $("extend-lookup-form")?.requestSubmit();
   });
 
   sessionToken = loadStoredSessionToken();

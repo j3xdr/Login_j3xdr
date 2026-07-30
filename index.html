@@ -4,14 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>CKR Admin Console</title>
-  <meta name="description" content="CKR WWDC POS admin — เติมวัน / เติมโทเค็น" />
+  <meta name="description" content="CKR WWDC POS admin — เช่าวัน PC / เช่าวัน Web" />
   <meta name="color-scheme" content="dark" />
   <meta name="theme-color" content="#1a0f0a" />
   <link rel="icon" href="assets/logo_4k.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260726-pos5" />
+  <link rel="stylesheet" href="./styles.css?v=20260730-rental2" />
 </head>
 <body>
   <div class="bakery-bg" aria-hidden="true">
@@ -30,7 +30,7 @@
         <img src="assets/logo_4k.png" width="48" height="48" alt="" />
         <div>
           <h1>CKR Admin Console</h1>
-          <p>POS · จัดการวันใช้งาน &amp; โทเค็น</p>
+          <p>POS · จัดการวันใช้งาน PC &amp; Web</p>
         </div>
       </div>
       <form id="login-form" autocomplete="on">
@@ -93,8 +93,8 @@
           <button type="button" id="logout-btn-mobile" class="btn btn-ghost btn-sm">ออก</button>
         </div>
         <div class="mode-switch" role="group" aria-label="โหมดการเติม">
-          <button type="button" class="mode-btn is-active" data-mode="day" id="mode-day"><span class="mode-long">เติมวัน (PC)</span><span class="mode-short">เติมวัน</span></button>
-          <button type="button" class="mode-btn" data-mode="token" id="mode-token"><span class="mode-long">เติมโทเค็น (Web)</span><span class="mode-short">โทเค็น</span></button>
+          <button type="button" class="mode-btn is-active" data-mode="day" id="mode-day"><span class="mode-long">เช่าวัน (PC)</span><span class="mode-short">PC</span></button>
+          <button type="button" class="mode-btn" data-mode="web" id="mode-web"><span class="mode-long">เช่าวัน (Web)</span><span class="mode-short">Web</span></button>
         </div>
         <div class="topbar-right">
           <form id="quick-search-form" class="quick-search">
@@ -110,7 +110,7 @@
       <section id="view-overview" class="pos-view is-active" data-panel="overview">
         <div class="view-head">
           <h2>ภาพรวม</h2>
-          <p class="muted" id="overview-mode-hint">โหมด: เติมวัน (PC)</p>
+          <p class="muted" id="overview-mode-hint">โหมด: เช่าวัน (PC)</p>
         </div>
         <div class="kpi-grid">
           <article class="kpi-card">
@@ -128,10 +128,10 @@
             <span class="kpi-label">หมดอายุ / ยังไม่ตั้ง</span>
             <strong id="kpi-expired" class="kpi-value">—</strong>
           </article>
-          <article class="kpi-card kpi-token">
+          <article class="kpi-card kpi-web">
             <img class="kpi-icon" src="assets_web/coin.png" alt="" width="36" height="36" />
-            <span class="kpi-label">โทเค็นเติมวันนี้</span>
-            <strong id="kpi-tokens" class="kpi-value">—</strong>
+            <span class="kpi-label" id="kpi-extra-label">เติมเงินวันนี้</span>
+            <strong id="kpi-extra" class="kpi-value">—</strong>
           </article>
         </div>
         <div class="panel">
@@ -168,8 +168,7 @@
         </div>
         <div class="cashier-grid">
           <div class="cashier-forms">
-            <!-- Day mode: create -->
-            <div class="panel mode-day-only">
+            <div class="panel">
               <h3>สร้างผู้ใช้ + เปิดวัน</h3>
               <form id="create-form">
                 <div class="grid-2">
@@ -186,11 +185,13 @@
                   <input type="checkbox" id="create-permanent" />
                   <span>บัญชีถาวร</span>
                 </label>
-                <div id="create-duration-block" class="duration-block">
-                  <div class="pack-row">
+                <div id="create-duration-block" class="duration-block" data-free-trial="0">
+                  <div class="pack-row pack-row-wide">
                     <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="1" data-pack-target="create">1 วัน</button>
                     <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="7" data-pack-target="create">7 วัน</button>
                     <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="30" data-pack-target="create">30 วัน</button>
+                    <button type="button" class="btn btn-ghost btn-sm pack-btn pack-trial" data-pack-hours="1" data-pack-free-trial="1" data-pack-target="create">ทดลอง 1 ชม.</button>
+                    <button type="button" class="btn btn-ghost btn-sm pack-btn pack-permanent" data-pack-permanent="1" data-pack-target="create">ถาวร</button>
                   </div>
                   <div class="grid-3">
                     <label class="field"><span>วัน</span><input id="create-days" type="number" min="0" max="3650" value="1" /></label>
@@ -203,8 +204,7 @@
               </form>
             </div>
 
-            <!-- Day mode: extend -->
-            <div class="panel mode-day-only">
+            <div class="panel">
               <h3>ต่ออายุ / ถาวร / ตัดสิทธิ์</h3>
               <form id="extend-lookup-form" class="inline-row">
                 <label class="field grow">
@@ -219,17 +219,26 @@
                   <input type="checkbox" id="extend-permanent" />
                   <span>ตั้งเป็นถาวร</span>
                 </label>
-                <div id="extend-duration-block" class="duration-block">
-                  <div class="pack-row">
-                    <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="1" data-pack-target="extend">+1</button>
-                    <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="7" data-pack-target="extend">+7</button>
-                    <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="30" data-pack-target="extend">+30</button>
+                <div id="extend-duration-block" class="duration-block" data-free-trial="0">
+                  <div class="pack-row pack-row-wide">
+                    <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="1" data-pack-target="extend">+1 วัน</button>
+                    <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="7" data-pack-target="extend">+7 วัน</button>
+                    <button type="button" class="btn btn-ghost btn-sm pack-btn" data-pack-days="30" data-pack-target="extend">+30 วัน</button>
+                    <button type="button" class="btn btn-ghost btn-sm pack-btn pack-trial" data-pack-hours="1" data-pack-free-trial="1" data-pack-target="extend">ทดลอง 1 ชม.</button>
+                    <button type="button" class="btn btn-ghost btn-sm pack-btn pack-permanent" data-pack-permanent="1" data-pack-target="extend">ถาวร</button>
                   </div>
                   <div class="grid-3">
                     <label class="field"><span>วัน</span><input id="extend-days" type="number" min="0" max="3650" value="1" /></label>
                     <label class="field"><span>ชม.</span><input id="extend-hours" type="number" min="0" max="23" value="0" /></label>
                     <label class="field"><span>นาที</span><input id="extend-minutes" type="number" min="0" max="59" value="0" /></label>
                   </div>
+                </div>
+                <div class="custom-expiry-block">
+                  <label class="field">
+                    <span>ตั้งวันหมดอายุเอง</span>
+                    <input id="extend-expires-at" type="datetime-local" />
+                  </label>
+                  <button type="button" class="btn btn-ghost" id="set-expires-btn">ตั้งวันหมดอายุ</button>
                 </div>
                 <div class="inline-row-actions">
                   <button class="btn btn-primary" type="submit" id="extend-btn">ต่ออายุ</button>
@@ -239,30 +248,6 @@
               </form>
             </div>
 
-            <!-- Token mode -->
-            <div class="panel mode-token-only">
-              <h3>เติมโทเค็น</h3>
-              <form id="lookup-form" class="inline-row">
-                <label class="field grow">
-                  <span>ค้นหาชื่อผู้ใช้</span>
-                  <input id="lookup-q" type="text" required spellcheck="false" />
-                </label>
-                <button class="btn btn-ghost" type="submit">ค้นหา</button>
-              </form>
-              <div id="lookup-result" class="lookup-box muted">—</div>
-              <form id="credit-form" class="inline-row">
-                <label class="field grow">
-                  <span>ชื่อผู้ใช้</span>
-                  <input id="credit-q" type="text" required spellcheck="false" />
-                </label>
-                <label class="field narrow">
-                  <span>จำนวน</span>
-                  <input id="credit-amt" type="number" min="1" value="10" required />
-                </label>
-                <button class="btn btn-primary" type="submit">เติมโทเค็น</button>
-              </form>
-              <p id="credit-status" class="status muted" role="status"></p>
-            </div>
           </div>
 
           <aside class="panel receipt-panel" aria-live="polite">
@@ -296,7 +281,7 @@
             </div>
             <p id="settings-status" class="status muted" role="status"></p>
           </div>
-          <div class="panel mode-token-only">
+          <div class="panel mode-web-only">
             <div class="panel-head-row">
               <h3>เติมค้าง / ตามมือ</h3>
               <button type="button" class="btn btn-ghost btn-sm" id="refresh-stuck-btn">รีเฟรช</button>
@@ -327,7 +312,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./config.js?v=20260726-pos5"></script>
-  <script src="./app.js?v=20260726-pos5"></script>
+  <script src="./config.js?v=20260730-rental2"></script>
+  <script src="./app.js?v=20260730-rental2"></script>
 </body>
 </html>
