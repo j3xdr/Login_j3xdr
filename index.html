@@ -2,16 +2,16 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CKR Admin Console</title>
   <meta name="description" content="CKR WWDC Admin — เช่าวัน PC / Web" />
   <meta name="color-scheme" content="dark" />
-  <meta name="theme-color" content="#111318" />
+  <meta name="theme-color" content="#000000" />
   <link rel="icon" href="assets/logo_4k.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260730-ui4" />
+  <link rel="stylesheet" href="./styles.css?v=20260731-ux1" />
 </head>
 <body>
   <!-- LOGIN -->
@@ -44,27 +44,40 @@
     <aside class="pos-sidebar" aria-label="เมนูหลัก">
       <div class="sidebar-brand">
         <img src="assets/logo_4k.png" width="32" height="32" alt="" />
-        <div>
+        <div class="sidebar-brand-text">
           <strong>CKR Admin</strong>
           <span id="sidebar-mode-label">PC</span>
         </div>
       </div>
       <nav class="sidebar-nav pos-bottom-nav" aria-label="แท็บหลัก">
-        <button type="button" class="nav-item is-active" data-view="overview">
-          <span class="nav-dot"></span><span>ภาพรวม</span>
+        <button type="button" class="nav-item is-active" data-view="overview" title="ภาพรวม">
+          <span class="nav-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          </span>
+          <span class="nav-label">ภาพรวม</span>
         </button>
-        <button type="button" class="nav-item" data-view="users">
-          <span class="nav-dot"></span><span>ผู้ใช้</span>
+        <button type="button" class="nav-item" data-view="users" title="ผู้ใช้">
+          <span class="nav-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          <span class="nav-label">ผู้ใช้</span>
         </button>
-        <button type="button" class="nav-item" data-view="cashier">
-          <span class="nav-dot"></span><span>แคชเชียร์</span>
+        <button type="button" class="nav-item" data-view="cashier" title="แคชเชียร์">
+          <span class="nav-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
+          </span>
+          <span class="nav-label">แคชเชียร์</span>
         </button>
-        <button type="button" class="nav-item" data-view="system">
-          <span class="nav-dot"></span><span>ระบบ</span>
+        <button type="button" class="nav-item" data-view="system" title="ระบบ">
+          <span class="nav-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </span>
+          <span class="nav-label">ระบบ</span>
         </button>
       </nav>
       <div class="sidebar-foot">
         <p id="who-user" class="sidebar-who">—</p>
+        <button type="button" id="density-btn" class="btn btn-ghost btn-block btn-sm" title="สลับความหนาแน่น">ความหนาแน่น</button>
         <button type="button" id="logout-btn" class="btn btn-ghost btn-block btn-sm">ออกจากระบบ</button>
       </div>
     </aside>
@@ -81,11 +94,15 @@
           <button type="button" class="mode-btn" data-mode="web" id="mode-web">Web</button>
         </div>
         <div class="topbar-right">
+          <button type="button" id="cmd-open-btn" class="btn btn-ghost btn-sm cmd-hint-btn" title="ค้นหาด่วน (⌘K)">
+            <span class="cmd-hint-label">ค้นหา</span>
+            <kbd>⌘K</kbd>
+          </button>
           <div id="api-status" class="api-chip is-waking" aria-live="polite">API…</div>
         </div>
       </header>
 
-      <div class="pos-content">
+      <main class="pos-content">
 
         <!-- OVERVIEW -->
         <section id="view-overview" class="pos-view is-active" data-panel="overview">
@@ -141,7 +158,10 @@
           </div>
 
           <div class="users-toolbar panel">
-            <input id="users-search" type="search" placeholder="ค้นหา username…" spellcheck="false" autocomplete="off" />
+            <div class="search-field">
+              <input id="users-search" type="search" placeholder="ค้นหา username…" spellcheck="false" autocomplete="off" enterkeyhint="search" />
+              <button type="button" class="search-clear" id="users-search-clear" aria-label="ล้างคำค้น" hidden>×</button>
+            </div>
             <select id="users-sort" class="select-input" aria-label="เรียงลำดับ">
               <option value="created_desc">สมัครล่าสุด</option>
               <option value="created_asc">สมัครเก่าสุด</option>
@@ -152,21 +172,21 @@
           </div>
 
           <div class="filter-chips" role="group" aria-label="กรองสถานะ">
-            <button type="button" class="chip is-active" data-user-filter="all">ทั้งหมด</button>
-            <button type="button" class="chip" data-user-filter="active">ใช้งานได้</button>
-            <button type="button" class="chip" data-user-filter="permanent">ถาวร</button>
-            <button type="button" class="chip" data-user-filter="expired">หมดอายุ</button>
-            <button type="button" class="chip" data-user-filter="unset">ยังไม่ตั้ง</button>
-            <button type="button" class="chip" data-user-filter="banned">แบน</button>
+            <button type="button" class="chip is-active" data-user-filter="all" aria-pressed="true">ทั้งหมด <span class="chip-count" data-count-for="all">0</span></button>
+            <button type="button" class="chip" data-user-filter="active" aria-pressed="false">ใช้งานได้ <span class="chip-count" data-count-for="active">0</span></button>
+            <button type="button" class="chip" data-user-filter="permanent" aria-pressed="false">ถาวร <span class="chip-count" data-count-for="permanent">0</span></button>
+            <button type="button" class="chip" data-user-filter="expired" aria-pressed="false">หมดอายุ <span class="chip-count" data-count-for="expired">0</span></button>
+            <button type="button" class="chip" data-user-filter="unset" aria-pressed="false">ยังไม่ตั้ง <span class="chip-count" data-count-for="unset">0</span></button>
+            <button type="button" class="chip" data-user-filter="banned" aria-pressed="false">แบน <span class="chip-count" data-count-for="banned">0</span></button>
           </div>
 
           <div class="table-wrap panel users-desktop">
             <table class="data-table" id="users-table">
               <thead>
                 <tr>
-                  <th>ชื่อผู้ใช้</th>
-                  <th>สมัครเมื่อ</th>
-                  <th>หมดอายุ</th>
+                  <th data-sort-key="name" tabindex="0" role="columnheader" aria-sort="none">ชื่อผู้ใช้</th>
+                  <th data-sort-key="created" tabindex="0" role="columnheader" aria-sort="descending">สมัครเมื่อ</th>
+                  <th data-sort-key="expires" tabindex="0" role="columnheader" aria-sort="none">หมดอายุ</th>
                   <th>สถานะ</th>
                   <th></th>
                 </tr>
@@ -177,6 +197,9 @@
             </table>
           </div>
           <div id="users-cards" class="users-mobile"></div>
+          <div id="users-more-wrap" class="users-more-wrap hidden">
+            <button type="button" class="btn btn-ghost" id="users-more-btn">แสดงเพิ่ม</button>
+          </div>
           <p id="list-status" class="status muted" role="status"></p>
         </section>
 
@@ -192,9 +215,9 @@
           <div class="cashier-grid">
             <div class="cashier-main">
               <div class="tab-bar" role="tablist">
-                <button type="button" class="tab-btn is-active" data-cashier-tab="create" role="tab">สร้างใหม่</button>
-                <button type="button" class="tab-btn" data-cashier-tab="extend" role="tab">ต่ออายุ</button>
-                <button type="button" class="tab-btn" data-cashier-tab="expires" role="tab">ตั้งวันหมดอายุ</button>
+                <button type="button" class="tab-btn is-active" data-cashier-tab="create" role="tab" aria-selected="true">สร้างใหม่</button>
+                <button type="button" class="tab-btn" data-cashier-tab="extend" role="tab" aria-selected="false">ต่ออายุ</button>
+                <button type="button" class="tab-btn" data-cashier-tab="expires" role="tab" aria-selected="false">ตั้งวันหมดอายุ</button>
               </div>
 
               <div id="cashier-tab-create" class="cashier-tab panel is-active" role="tabpanel">
@@ -222,9 +245,9 @@
                       <button type="button" class="btn btn-ghost btn-sm pack-btn pack-permanent" data-pack-permanent="1" data-pack-target="create">ถาวร</button>
                     </div>
                     <div class="grid-3">
-                      <label class="field"><span>วัน</span><input id="create-days" type="number" min="0" max="3650" value="1" /></label>
-                      <label class="field"><span>ชม.</span><input id="create-hours" type="number" min="0" max="23" value="0" /></label>
-                      <label class="field"><span>นาที</span><input id="create-minutes" type="number" min="0" max="59" value="0" /></label>
+                      <label class="field"><span>วัน</span><input id="create-days" type="number" inputmode="numeric" min="0" max="3650" value="1" /></label>
+                      <label class="field"><span>ชม.</span><input id="create-hours" type="number" inputmode="numeric" min="0" max="23" value="0" /></label>
+                      <label class="field"><span>นาที</span><input id="create-minutes" type="number" inputmode="numeric" min="0" max="59" value="0" /></label>
                     </div>
                   </div>
                   <button class="btn btn-primary" type="submit" id="create-btn">สร้างผู้ใช้</button>
@@ -236,7 +259,7 @@
                 <form id="extend-lookup-form" class="inline-row">
                   <label class="field grow">
                     <span>ชื่อผู้ใช้</span>
-                    <input id="extend-q" type="text" required spellcheck="false" autocomplete="off" />
+                    <input id="extend-q" type="text" required spellcheck="false" autocomplete="off" enterkeyhint="search" />
                   </label>
                   <button class="btn btn-ghost" type="submit">ค้นหา</button>
                 </form>
@@ -255,9 +278,9 @@
                       <button type="button" class="btn btn-ghost btn-sm pack-btn pack-permanent" data-pack-permanent="1" data-pack-target="extend">ถาวร</button>
                     </div>
                     <div class="grid-3">
-                      <label class="field"><span>วัน</span><input id="extend-days" type="number" min="0" max="3650" value="1" /></label>
-                      <label class="field"><span>ชม.</span><input id="extend-hours" type="number" min="0" max="23" value="0" /></label>
-                      <label class="field"><span>นาที</span><input id="extend-minutes" type="number" min="0" max="59" value="0" /></label>
+                      <label class="field"><span>วัน</span><input id="extend-days" type="number" inputmode="numeric" min="0" max="3650" value="1" /></label>
+                      <label class="field"><span>ชม.</span><input id="extend-hours" type="number" inputmode="numeric" min="0" max="23" value="0" /></label>
+                      <label class="field"><span>นาที</span><input id="extend-minutes" type="number" inputmode="numeric" min="0" max="59" value="0" /></label>
                     </div>
                   </div>
                   <div class="inline-row-actions">
@@ -272,7 +295,7 @@
                 <form id="expires-lookup-form" class="inline-row">
                   <label class="field grow">
                     <span>ชื่อผู้ใช้</span>
-                    <input id="expires-q" type="text" required spellcheck="false" autocomplete="off" />
+                    <input id="expires-q" type="text" required spellcheck="false" autocomplete="off" enterkeyhint="search" />
                   </label>
                   <button class="btn btn-ghost" type="submit">ค้นหา</button>
                 </form>
@@ -321,7 +344,10 @@
                 <button type="button" class="btn btn-ghost btn-sm" id="refresh-audit-btn">รีเฟรช</button>
               </div>
               <div class="audit-toolbar">
-                <input id="audit-search" type="search" placeholder="ค้นหา action / user id…" spellcheck="false" />
+                <div class="search-field">
+                  <input id="audit-search" type="search" placeholder="ค้นหา action / user id…" spellcheck="false" enterkeyhint="search" />
+                  <button type="button" class="search-clear" id="audit-search-clear" aria-label="ล้างคำค้น" hidden>×</button>
+                </div>
                 <select id="audit-filter" class="select-input">
                   <option value="all">ทุก action</option>
                   <option value="rental">เช่า / ต่ออายุ</option>
@@ -335,13 +361,14 @@
           </div>
         </section>
 
-      </div>
+      </main>
     </div>
 
     <!-- USER DRAWER -->
     <aside id="user-drawer" class="user-drawer hidden" aria-hidden="true">
       <button type="button" class="drawer-backdrop" id="drawer-backdrop" aria-label="ปิด"></button>
-      <div class="drawer-panel" role="dialog" aria-labelledby="drawer-title">
+      <div class="drawer-panel" role="dialog" aria-labelledby="drawer-title" aria-modal="true">
+        <div class="drawer-handle" aria-hidden="true"><span></span></div>
         <div class="drawer-head">
           <h3 id="drawer-title">รายละเอียดผู้ใช้</h3>
           <button type="button" id="drawer-close" class="btn btn-ghost btn-sm" aria-label="ปิด">ปิด</button>
@@ -362,8 +389,20 @@
     </div>
   </div>
 
+  <!-- Command palette -->
+  <div id="cmd-root" class="cmd-root hidden" aria-hidden="true">
+    <button type="button" class="cmd-backdrop" id="cmd-backdrop" aria-label="ปิด"></button>
+    <div class="cmd-panel" role="dialog" aria-modal="true" aria-label="ค้นหาด่วน">
+      <input id="cmd-input" class="cmd-input" type="search" placeholder="ค้นหาผู้ใช้ หรือคำสั่ง…" autocomplete="off" spellcheck="false" />
+      <div id="cmd-list" class="cmd-list" role="listbox"></div>
+      <div class="cmd-foot muted">↑↓ เลือก · Enter เปิด · Esc ปิด</div>
+    </div>
+  </div>
+
+  <div id="toast-root" class="toast-root" aria-live="polite" aria-relevant="additions"></div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260731-split"></script>
+  <script src="./app.js?v=20260731-ux1"></script>
 </body>
 </html>

@@ -12,7 +12,9 @@
   const API = cfg.API_BASE || "";
   const SESSION_KEY = "ckr_admin_session_token";
   const MODE_KEY = "ckr_admin_mode";
+  const DENSITY_KEY = "ckr_admin_density";
   const EDGE_ADMIN_FN = "admin-register";
+  const USERS_PAGE = 100;
   const { createClient } = supabase;
   const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
@@ -25,6 +27,7 @@
   const modalBody = $("modal-body");
   const modalActions = $("modal-actions");
   const modalCard = modalRoot?.querySelector(".modal-card") || null;
+  const cmdRoot = $("cmd-root");
 
   let accessToken = null;
   let sessionToken = null;
@@ -51,12 +54,248 @@
   let userSearch = "";
   let drawerUserId = null;
   let cashierTab = "create";
+  let usersVisibleLimit = USERS_PAGE;
+  let overlayStack = [];
+  let overlayCloseTimers = new WeakMap();
+  let gPending = false;
+  let gTimer = null;
+  let cmdActiveIndex = 0;
+  let cmdItems = [];
 
   function setStatus(el, text, kind) {
     if (!el) return;
     el.textContent = text || "";
     el.className = "status " + (kind || "muted");
+    if (text && (kind === "ok" || kind === "err")) {
+      toast(text, kind === "ok" ? "ok" : "err");
+    }
   }
+
+  function debounce(fn, ms) {
+    let t = null;
+    return function (...args) {
+      clearTimeout(t);
+      t = setTimeout(() => fn.apply(this, args), ms);
+    };
+  }
+
+  function setBtnLoading(btn, on) {
+    if (!btn) return;
+    if (on) {
+      if (!btn.dataset.w) btn.dataset.w = btn.style.width || btn.offsetWidth + "px";
+      btn.style.width = btn.dataset.w;
+      btn.classList.add("is-loading");
+      btn.disabled = true;
+    } else {
+      btn.classList.remove("is-loading");
+      btn.disabled = false;
+      btn.style.width = "";
+      delete btn.dataset.w;
+    }
+  }
+
+  function toast(message, kind) {
+    const root = $("toast-root");
+    if (!root || !message) return;
+    const el = document.createElement("div");
+    el.className = "toast is-" + (kind || "ok");
+    el.innerHTML =
+      '<div class="toast-msg">' +
+      escapeHtml(message) +
+      '</div><button type="button" class="toast-close" aria-label="ปิด">×</button>';
+    const close = () => {
+      el.remove();
+    };
+    el.querySelector(".toast-close")?.addEventListener("click", close);
+    root.appendChild(el);
+    setTimeout(close, 3500);
+  }
+
+  function skeletonHtml(kind) {
+    if (kind === "table") {
+      return Array.from({ length: 5 })
+        .map(
+          () =>
+            '<tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>'
+        )
+        .join("");
+    }
+    if (kind === "cards") {
+      return Array.from({ length: 4 })
+        .map(() => '<div class="skeleton skeleton-card"></div>')
+        .join("");
+    }
+    if (kind === "stats") {
+      return Array.from({ length: 4 })
+        .map(
+          () =>
+            '<div class="mini-stat"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:40%"></div></div>'
+        )
+        .join("");
+    }
+    return Array.from({ length: 4 })
+      .map(
+        () =>
+          '<div class="activity-row"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line" style="width:55%"></div></div>'
+      )
+      .join("");
+  }
+
+  /* ---- Overlay controller ---- */
+  const FOCUSABLE =
+    'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
+
+  function syncBodyLock() {
+    if (overlayStack.length) {
+      document.documentElement.style.setProperty(
+        "--scrollbar-pad",
+        window.innerWidth - document.documentElement.clientWidth + "px"
+      );
+      document.body.classList.add("is-locked");
+    } else {
+      document.body.classList.remove("is-locked");
+      document.documentElement.style.setProperty("--scrollbar-pad", "0px");
+    }
+  }
+
+  function openOverlay(el, { onClose, initialFocus } = {}) {
+    if (!el) return;
+    const pending = overlayCloseTimers.get(el);
+    if (pending) {
+      clearTimeout(pending);
+      overlayCloseTimers.delete(el);
+    }
+    const restoreTo = document.activeElement;
+    if (!overlayStack.some((x) => x.el === el)) {
+      overlayStack.push({ el, onClose, restoreTo });
+    }
+    el.classList.remove("hidden");
+    el.setAttribute("aria-hidden", "false");
+    requestAnimationFrame(() => el.classList.add("is-open"));
+    syncBodyLock();
+    const focusEl =
+      initialFocus ||
+      el.querySelector("[autofocus]") ||
+      el.querySelector(FOCUSABLE);
+    setTimeout(() => focusEl?.focus?.(), 30);
+  }
+
+  function closeOverlay(el) {
+    if (!el) return;
+    const idx = overlayStack.findIndex((x) => x.el === el);
+    const entry = idx >= 0 ? overlayStack.splice(idx, 1)[0] : null;
+    el.classList.remove("is-open");
+    const prev = overlayCloseTimers.get(el);
+    if (prev) clearTimeout(prev);
+    const finish = () => {
+      overlayCloseTimers.delete(el);
+      if (overlayStack.some((x) => x.el === el)) return;
+      el.classList.add("hidden");
+      el.setAttribute("aria-hidden", "true");
+      syncBodyLock();
+      if (entry?.restoreTo && typeof entry.restoreTo.focus === "function") {
+        try {
+          entry.restoreTo.focus();
+        } catch (_) {}
+      }
+    };
+    overlayCloseTimers.set(el, setTimeout(finish, 200));
+    if (typeof entry?.onClose === "function") entry.onClose();
+  }
+
+  function closeTopOverlay() {
+    const top = overlayStack[overlayStack.length - 1];
+    if (!top) return false;
+    if (top.el === modalRoot) {
+      if (modalMode === "prompt") closeModalAndSettle(null);
+      else if (modalMode === "confirm") closeModalAndSettle(false);
+      else closeModalAndSettle(true);
+      return true;
+    }
+    if (top.el === $("user-drawer")) {
+      closeUserDrawer();
+      return true;
+    }
+    if (top.el === cmdRoot) {
+      closeCommandPalette();
+      return true;
+    }
+    closeOverlay(top.el);
+    return true;
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      if (closeTopOverlay()) {
+        e.preventDefault();
+        return;
+      }
+    }
+
+    const top = overlayStack[overlayStack.length - 1];
+    if (top && e.key === "Tab") {
+      const nodes = [...top.el.querySelectorAll(FOCUSABLE)].filter(
+        (n) => n.offsetParent !== null || n === document.activeElement
+      );
+      if (!nodes.length) return;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    if (top && top.el === cmdRoot) {
+      handleCmdKeydown(e);
+      return;
+    }
+
+    const tag = (e.target?.tagName || "").toLowerCase();
+    const typing =
+      tag === "input" ||
+      tag === "textarea" ||
+      tag === "select" ||
+      e.target?.isContentEditable;
+
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      openCommandPalette();
+      return;
+    }
+
+    if (typing || overlayStack.length) return;
+
+    if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      showView("users");
+      $("users-search")?.focus();
+      return;
+    }
+
+    if (e.key.toLowerCase() === "g" && !e.metaKey && !e.ctrlKey) {
+      gPending = true;
+      clearTimeout(gTimer);
+      gTimer = setTimeout(() => {
+        gPending = false;
+      }, 800);
+      return;
+    }
+
+    if (gPending) {
+      const map = { o: "overview", u: "users", c: "cashier", s: "system" };
+      const view = map[e.key.toLowerCase()];
+      if (view) {
+        e.preventDefault();
+        showView(view);
+      }
+      gPending = false;
+      clearTimeout(gTimer);
+    }
+  });
 
   function escapeHtml(s) {
     return String(s ?? "")
@@ -126,17 +365,15 @@
     modalTitle.textContent = title;
     if (bodyHtml) modalBody.innerHTML = bodyHtml;
     else modalBody.textContent = body || "";
-    modalRoot.classList.remove("hidden");
-    modalRoot.setAttribute("aria-hidden", "false");
     const closeBtn = $("modal-close");
     if (closeBtn) closeBtn.classList.toggle("hidden", !!locked);
+    openOverlay(modalRoot);
   }
 
   function forceCloseModal() {
     modalMode = null;
     clearModalActions();
-    modalRoot.classList.add("hidden");
-    modalRoot.setAttribute("aria-hidden", "true");
+    closeOverlay(modalRoot);
   }
 
   function closeModalAndSettle(value) {
@@ -196,7 +433,7 @@
         bodyHtml:
           "<p>" +
           escapeHtml(body || "") +
-          '</p><input class="prompt-input" id="modal-prompt-input" type="text" style="width:100%;padding:9px 12px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit" />',
+          '</p><input class="prompt-input" id="modal-prompt-input" type="text" />',
         icon: icon || "assets/score.png",
       });
       const input = $("modal-prompt-input");
@@ -238,6 +475,12 @@
   }
 
   $("modal-close")?.addEventListener("click", () => {
+    if (modalMode === "prompt") closeModalAndSettle(null);
+    else if (modalMode === "confirm") closeModalAndSettle(false);
+    else closeModalAndSettle(true);
+  });
+
+  modalRoot?.querySelector(".modal-backdrop")?.addEventListener("click", () => {
     if (modalMode === "prompt") closeModalAndSettle(null);
     else if (modalMode === "confirm") closeModalAndSettle(false);
     else closeModalAndSettle(true);
@@ -715,8 +958,88 @@
     return arr;
   }
 
+  function getFilteredUsers() {
+    return sortUsers(
+      cachedUsers.filter((u) => matchesUserFilter(u) && matchesUserSearch(u))
+    );
+  }
+
   function getDisplayUsers() {
-    return sortUsers(cachedUsers.filter((u) => matchesUserFilter(u) && matchesUserSearch(u)));
+    return getFilteredUsers().slice(0, usersVisibleLimit);
+  }
+
+  function paintFilterCounts() {
+    const counts = {
+      all: cachedUsers.length,
+      active: 0,
+      permanent: 0,
+      expired: 0,
+      unset: 0,
+      banned: 0,
+    };
+    cachedUsers.forEach((u) => {
+      const k = rentalStatus(u).kind;
+      if (counts[k] !== undefined) counts[k] += 1;
+    });
+    document.querySelectorAll("[data-count-for]").forEach((el) => {
+      const key = el.getAttribute("data-count-for");
+      el.textContent = String(counts[key] ?? 0);
+    });
+  }
+
+  function syncSortHeaders() {
+    const map = {
+      created_desc: ["created", "descending"],
+      created_asc: ["created", "ascending"],
+      expires_asc: ["expires", "ascending"],
+      expires_desc: ["expires", "descending"],
+      name_asc: ["name", "ascending"],
+    };
+    const [key, dir] = map[userSort] || ["created", "descending"];
+    document.querySelectorAll("#users-table th[data-sort-key]").forEach((th) => {
+      const k = th.getAttribute("data-sort-key");
+      th.setAttribute("aria-sort", k === key ? dir : "none");
+    });
+    if ($("users-sort") && $("users-sort").value !== userSort) {
+      $("users-sort").value = userSort;
+    }
+  }
+
+  function animateKpi(el, value) {
+    if (!el) return;
+    const next = String(value);
+    if (el.textContent === next) return;
+    el.textContent = next;
+    el.animate?.(
+      [{ opacity: 0.45, transform: "translateY(2px)" }, { opacity: 1, transform: "none" }],
+      { duration: 320, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }
+    );
+  }
+
+  function emptyUsersHtml(desktop) {
+    const hasFilter = userFilter !== "all" || !!userSearch;
+    const msg = hasFilter
+      ? "ไม่พบผู้ใช้ที่ตรงกับคำค้นหรือตัวกรอง"
+      : "ยังไม่มีผู้ใช้ในโหมดนี้";
+    const cta = hasFilter
+      ? '<button type="button" class="btn btn-ghost btn-sm" data-action="clear-filters">ล้างตัวกรอง</button>'
+      : '<button type="button" class="btn btn-primary btn-sm" data-action="goto-create">สร้างบัญชี</button>';
+    if (desktop) {
+      return (
+        '<tr><td colspan="5"><div class="empty-state"><strong>' +
+        msg +
+        "</strong><p class=\"muted\">ลองเปลี่ยนตัวกรอง หรือสร้างบัญชีใหม่</p>" +
+        cta +
+        "</div></td></tr>"
+      );
+    }
+    return (
+      '<div class="empty-state"><strong>' +
+      msg +
+      '</strong><p class="muted">ลองเปลี่ยนตัวกรอง หรือสร้างบัญชีใหม่</p>' +
+      cta +
+      "</div>"
+    );
   }
 
   function findUserById(id) {
@@ -733,7 +1056,7 @@
   }
 
   function exportUsersCsv() {
-    const rows = getDisplayUsers();
+    const rows = getFilteredUsers();
     const header = ["username", "created_at", "expires_at", "status", "role"];
     const lines = [header.join(",")];
     rows.forEach((u) => {
@@ -763,7 +1086,9 @@
   function showCashierTab(name) {
     cashierTab = name || "create";
     document.querySelectorAll("[data-cashier-tab]").forEach((btn) => {
-      btn.classList.toggle("is-active", btn.getAttribute("data-cashier-tab") === cashierTab);
+      const on = btn.getAttribute("data-cashier-tab") === cashierTab;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
     });
     ["create", "extend", "expires"].forEach((t) => {
       const el = $("cashier-tab-" + t);
@@ -884,14 +1209,52 @@
 
   function closeUserDrawer() {
     drawerUserId = null;
-    $("user-drawer")?.classList.add("hidden");
-    $("user-drawer")?.setAttribute("aria-hidden", "true");
+    const drawer = $("user-drawer");
+    if (drawer) closeOverlay(drawer);
+  }
+
+  function bindDrawerSwipe(panel) {
+    if (!panel || panel.dataset.swipeBound === "1") return;
+    panel.dataset.swipeBound = "1";
+    let startY = 0;
+    let dragging = false;
+    panel.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (window.innerWidth > 768) return;
+        if (!e.target.closest(".drawer-handle, .drawer-head")) return;
+        dragging = true;
+        startY = e.clientY;
+        panel.setPointerCapture?.(e.pointerId);
+      },
+      { passive: true }
+    );
+    panel.addEventListener(
+      "pointermove",
+      (e) => {
+        if (!dragging) return;
+        const dy = Math.max(0, e.clientY - startY);
+        panel.style.transform = "translateY(" + dy + "px)";
+      },
+      { passive: true }
+    );
+    const end = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      const dy = Math.max(0, e.clientY - startY);
+      panel.style.transform = "";
+      if (dy > 80) closeUserDrawer();
+    };
+    panel.addEventListener("pointerup", end);
+    panel.addEventListener("pointercancel", end);
   }
 
   async function openUserDrawer(userId) {
     const u = findUserById(userId);
     if (!u) return;
     drawerUserId = userId;
+    const drawer = $("user-drawer");
+    bindDrawerSwipe(drawer?.querySelector(".drawer-panel"));
     const st = rentalStatus(u);
     const body = $("drawer-body");
     const actions = $("drawer-actions");
@@ -992,8 +1355,7 @@
         );
       }
     }
-    $("user-drawer")?.classList.remove("hidden");
-    $("user-drawer")?.setAttribute("aria-hidden", "false");
+    if (drawer) openOverlay(drawer, { initialFocus: $("drawer-close") });
     if (adminMode === "web" && u.id) loadDrawerTopups(u.id);
     else {
       const tp = $("drawer-topups");
@@ -1257,22 +1619,24 @@
       if (st.kind === "active" || st.kind === "permanent") active += 1;
       else if (st.kind === "expired" || st.kind === "unset") expired += 1;
     });
-    if ($("kpi-users")) $("kpi-users").textContent = String(total);
-    if ($("kpi-active")) $("kpi-active").textContent = String(active);
-    if ($("kpi-expired")) $("kpi-expired").textContent = String(expired);
-    if ($("kpi-expire-today")) $("kpi-expire-today").textContent = String(countExpiring(0));
-    if ($("kpi-expire-tomorrow")) {
-      $("kpi-expire-tomorrow").textContent = String(countExpiring(1));
-    }
+    animateKpi($("kpi-users"), total);
+    animateKpi($("kpi-active"), active);
+    animateKpi($("kpi-expired"), expired);
+    animateKpi($("kpi-expire-today"), countExpiring(0));
+    animateKpi($("kpi-expire-tomorrow"), countExpiring(1));
     if ($("kpi-topups")) {
-      $("kpi-topups").textContent =
-        adminMode === "web" && lastStats ? String(lastStats.topups ?? "—") : "—";
+      animateKpi(
+        $("kpi-topups"),
+        adminMode === "web" && lastStats ? lastStats.topups ?? "—" : "—"
+      );
     }
     if ($("users-count-label")) {
-      const shown = getDisplayUsers().length;
+      const filtered = getFilteredUsers().length;
+      const shown = Math.min(filtered, usersVisibleLimit);
       $("users-count-label").textContent =
-        "แสดง " + shown + " จาก " + total + " คน";
+        "แสดง " + shown + " จาก " + filtered + " คน (ทั้งหมด " + total + ")";
     }
+    paintFilterCounts();
     paintOverviewAlerts();
   }
 
@@ -1280,8 +1644,8 @@
   async function loadStuckTopups() {
     const root = $("stuck-topups");
     if (!root) return;
-    root.textContent = "กำลังโหลด…";
-    root.className = "admin-list muted";
+    root.className = "admin-list";
+    root.innerHTML = skeletonHtml("list");
     try {
       const data = await api("/api/admin/topups?status=needs_manual");
       const items = data.items || [];
@@ -1323,24 +1687,30 @@
 
   async function loadAudit() {
     const root = $("audit-list");
-    if (!root) return;
-    root.textContent = "กำลังโหลด…";
-    root.className = "admin-list muted";
+    const recent = $("recent-activity");
+    if (root) {
+      root.className = "admin-list";
+      root.innerHTML = skeletonHtml("list");
+    }
+    if (recent) {
+      recent.className = "activity-list";
+      recent.innerHTML = skeletonHtml("list");
+    }
     try {
       const data = await api("/api/admin/audit?limit=80");
       lastAudit = data.items || [];
       paintAuditList();
       paintRecentActivity();
     } catch (e) {
-      root.textContent = e.message || String(e);
+      if (root) root.textContent = e.message || String(e);
     }
   }
 
   async function loadStats() {
     const root = $("daily-stats-cards");
     if (!root) return;
-    root.textContent = "กำลังโหลด…";
-    root.className = "mini-stat-grid muted";
+    root.className = "mini-stat-grid";
+    root.innerHTML = skeletonHtml("stats");
     try {
       const data = await api("/api/admin/stats");
       lastStats = data;
@@ -1364,11 +1734,17 @@
   function renderUsers(users) {
     const body = $("users-body");
     const cards = $("users-cards");
-    const list = users || getDisplayUsers();
+    const filtered = users || getFilteredUsers();
+    const list = filtered.slice(0, usersVisibleLimit);
+    const moreWrap = $("users-more-wrap");
+    if (moreWrap) {
+      moreWrap.classList.toggle("hidden", filtered.length <= usersVisibleLimit);
+    }
+    syncSortHeaders();
 
     if (body) {
       if (!list.length) {
-        body.innerHTML = '<tr><td class="muted" colspan="5">ไม่พบผู้ใช้</td></tr>';
+        body.innerHTML = emptyUsersHtml(true);
       } else {
         body.innerHTML = list
           .map((u) => {
@@ -1378,11 +1754,12 @@
               escapeHtml(u.id || "") +
               '" data-username="' +
               escapeHtml(u.username || "") +
-              '"><td data-label="ชื่อผู้ใช้"><div class="user-cell"><strong class="user-name">' +
+              '" tabindex="0" role="button">' +
+              '<td data-label="ชื่อผู้ใช้"><div class="user-cell"><strong class="user-name">' +
               escapeHtml(u.username || "—") +
               '</strong><button type="button" class="copy-btn" data-copy="' +
               escapeHtml(u.username || "") +
-              '" title="คัดลอก">⎘</button></div></td><td data-label="สมัครเมื่อ" class="muted">' +
+              '" title="คัดลอก" aria-label="คัดลอก">คัดลอก</button></div></td><td data-label="สมัครเมื่อ" class="muted">' +
               escapeHtml(formatDay(u.created_at)) +
               '</td><td data-label="หมดอายุ" class="muted">' +
               escapeHtml(formatExpiryCell(u)) +
@@ -1399,7 +1776,7 @@
 
     if (cards) {
       if (!list.length) {
-        cards.innerHTML = '<p class="muted">ไม่พบผู้ใช้</p>';
+        cards.innerHTML = emptyUsersHtml(false);
       } else {
         cards.innerHTML = list
           .map((u) => {
@@ -1407,7 +1784,7 @@
             return (
               '<article class="user-card" data-user-id="' +
               escapeHtml(u.id || "") +
-              '"><div class="user-card-head"><strong>' +
+              '" tabindex="0" role="button"><div class="user-card-head"><strong>' +
               escapeHtml(u.username || "—") +
               '</strong><span class="tag tag-' +
               st.kind +
@@ -1429,10 +1806,9 @@
   async function loadUsers() {
     const listStatus = $("list-status");
     const body = $("users-body");
-    if (body) {
-      body.innerHTML =
-        '<tr><td class="muted" colspan="5">กำลังโหลด…</td></tr>';
-    }
+    const cards = $("users-cards");
+    if (body) body.innerHTML = skeletonHtml("table");
+    if (cards) cards.innerHTML = skeletonHtml("cards");
     try {
       let users = null;
       if (adminMode === "day") {
@@ -1446,9 +1822,13 @@
         users = data.users || [];
       }
       cachedUsers = users;
+      usersVisibleLimit = USERS_PAGE;
       renderUsers();
       paintKpis();
-      setStatus(listStatus, "", "muted");
+      if (listStatus) {
+        listStatus.textContent = "";
+        listStatus.className = "status muted";
+      }
     } catch (e) {
       if (body) body.innerHTML = "";
       setStatus(listStatus, e.message, "err");
@@ -1612,6 +1992,131 @@
     }
   }
 
+  /* ---- Command palette ---- */
+  function buildCmdItems(q) {
+    const query = (q || "").trim().toLowerCase();
+    const items = [];
+    const cmds = [
+      { id: "cmd-create", label: "สร้างบัญชี", meta: "แคชเชียร์", run: () => { showView("cashier"); showCashierTab("create"); } },
+      { id: "cmd-extend", label: "ต่ออายุ", meta: "แคชเชียร์", run: () => { showView("cashier"); showCashierTab("extend"); } },
+      { id: "cmd-users", label: "ไปหน้าผู้ใช้", meta: "นำทาง", run: () => showView("users") },
+      { id: "cmd-overview", label: "ไปหน้าภาพรวม", meta: "นำทาง", run: () => showView("overview") },
+      { id: "cmd-system", label: "ไปหน้าระบบ", meta: "นำทาง", run: () => showView("system") },
+      { id: "cmd-mode", label: "สลับโหมด PC / Web", meta: "โหมด", run: () => setMode(adminMode === "day" ? "web" : "day") },
+      { id: "cmd-refresh", label: "รีเฟรชข้อมูล", meta: "ระบบ", run: () => Promise.all([loadUsers(), loadStats(), loadAudit(), loadStuckTopups(), loadSettings()]) },
+    ];
+    cmds.forEach((c) => {
+      if (!query || c.label.toLowerCase().includes(query) || c.meta.toLowerCase().includes(query)) {
+        items.push(c);
+      }
+    });
+    cachedUsers
+      .filter((u) => !query || String(u.username || "").toLowerCase().includes(query))
+      .slice(0, 12)
+      .forEach((u) => {
+        const st = rentalStatus(u);
+        items.push({
+          id: "user-" + u.id,
+          label: u.username || "—",
+          meta: st.label,
+          run: () => {
+            showView("users");
+            openUserDrawer(u.id);
+          },
+        });
+      });
+    return items;
+  }
+
+  function paintCmdList() {
+    const list = $("cmd-list");
+    if (!list) return;
+    if (!cmdItems.length) {
+      list.innerHTML = '<div class="empty-state"><strong>ไม่พบผลลัพธ์</strong></div>';
+      return;
+    }
+    list.innerHTML = cmdItems
+      .map(
+        (item, i) =>
+          '<button type="button" class="cmd-item' +
+          (i === cmdActiveIndex ? " is-active" : "") +
+          '" data-cmd-index="' +
+          i +
+          '" role="option" aria-selected="' +
+          (i === cmdActiveIndex ? "true" : "false") +
+          '"><span>' +
+          escapeHtml(item.label) +
+          '</span><span class="cmd-item-meta">' +
+          escapeHtml(item.meta || "") +
+          "</span></button>"
+      )
+      .join("");
+  }
+
+  function openCommandPalette() {
+    if (!cmdRoot || !dash || dash.classList.contains("hidden")) return;
+    cmdItems = buildCmdItems("");
+    cmdActiveIndex = 0;
+    paintCmdList();
+    if (!overlayStack.some((x) => x.el === cmdRoot)) {
+      openOverlay(cmdRoot, { initialFocus: $("cmd-input") });
+    } else {
+      cmdRoot.classList.remove("hidden");
+      cmdRoot.classList.add("is-open");
+    }
+    if ($("cmd-input")) $("cmd-input").value = "";
+  }
+
+  function closeCommandPalette() {
+    if (cmdRoot) closeOverlay(cmdRoot);
+  }
+
+  function runCmdItem(index) {
+    const item = cmdItems[index];
+    if (!item) return;
+    closeCommandPalette();
+    item.run();
+  }
+
+  function handleCmdKeydown(e) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      cmdActiveIndex = Math.min(cmdItems.length - 1, cmdActiveIndex + 1);
+      paintCmdList();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      cmdActiveIndex = Math.max(0, cmdActiveIndex - 1);
+      paintCmdList();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      runCmdItem(cmdActiveIndex);
+    }
+  }
+
+  function applyDensity(mode) {
+    const compact = mode === "compact";
+    dash?.classList.toggle("density-compact", compact);
+    try {
+      localStorage.setItem(DENSITY_KEY, compact ? "compact" : "comfortable");
+    } catch (_) {}
+    const btn = $("density-btn");
+    if (btn) btn.textContent = compact ? "หนาแน่น: แน่น" : "หนาแน่น: สบาย";
+  }
+
+  function clearUserFilters() {
+    userFilter = "all";
+    userSearch = "";
+    usersVisibleLimit = USERS_PAGE;
+    if ($("users-search")) $("users-search").value = "";
+    $("users-search-clear")?.setAttribute("hidden", "");
+    document.querySelectorAll("[data-user-filter]").forEach((b) => {
+      const on = b.getAttribute("data-user-filter") === "all";
+      b.classList.toggle("is-active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    renderUsers();
+  }
+
   /* ---- Events ---- */
   document.querySelectorAll(".nav-item").forEach((btn) => {
     btn.addEventListener("click", () => showView(btn.getAttribute("data-view")));
@@ -1620,15 +2125,33 @@
   $("mode-day")?.addEventListener("click", () => setMode("day"));
   $("mode-web")?.addEventListener("click", () => setMode("web"));
 
+  function onUserRowActivate(el) {
+    if (!el) return;
+    openUserDrawer(el.getAttribute("data-user-id"));
+  }
+
   $("users-body")?.addEventListener("click", (e) => {
+    const clearBtn = e.target.closest('[data-action="clear-filters"]');
+    if (clearBtn) {
+      e.preventDefault();
+      clearUserFilters();
+      return;
+    }
+    const createBtn = e.target.closest('[data-action="goto-create"]');
+    if (createBtn) {
+      showView("cashier");
+      showCashierTab("create");
+      return;
+    }
     const copyBtn = e.target.closest("[data-copy]");
     if (copyBtn) {
       e.stopPropagation();
       copyText(copyBtn.getAttribute("data-copy") || "").then((ok) => {
-        if (ok) copyBtn.textContent = "✓";
-        setTimeout(() => {
-          copyBtn.textContent = "⎘";
-        }, 1200);
+        if (ok) {
+          copyBtn.classList.add("is-copied");
+          toast("คัดลอกแล้ว", "ok");
+          setTimeout(() => copyBtn.classList.remove("is-copied"), 1200);
+        }
       });
       return;
     }
@@ -1636,13 +2159,48 @@
     if (!row) return;
     const actionBtn = e.target.closest("[data-action]");
     if (actionBtn?.getAttribute("data-action") === "open-drawer" || !actionBtn) {
-      openUserDrawer(row.getAttribute("data-user-id"));
+      onUserRowActivate(row);
+    }
+  });
+
+  $("users-body")?.addEventListener("keydown", (e) => {
+    const row = e.target.closest("tr[data-user-id]");
+    if (!row) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onUserRowActivate(row);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      row.nextElementSibling?.focus?.();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      row.previousElementSibling?.focus?.();
     }
   });
 
   $("users-cards")?.addEventListener("click", (e) => {
+    const clearBtn = e.target.closest('[data-action="clear-filters"]');
+    if (clearBtn) {
+      clearUserFilters();
+      return;
+    }
+    const createBtn = e.target.closest('[data-action="goto-create"]');
+    if (createBtn) {
+      showView("cashier");
+      showCashierTab("create");
+      return;
+    }
     const card = e.target.closest("[data-user-id]");
-    if (card) openUserDrawer(card.getAttribute("data-user-id"));
+    if (card) onUserRowActivate(card);
+  });
+
+  $("users-cards")?.addEventListener("keydown", (e) => {
+    const card = e.target.closest("[data-user-id]");
+    if (!card) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onUserRowActivate(card);
+    }
   });
 
   $("drawer-close")?.addEventListener("click", closeUserDrawer);
@@ -1650,22 +2208,43 @@
   $("drawer-body")?.addEventListener("click", (e) => {
     const copyBtn = e.target.closest("[data-copy]");
     if (!copyBtn) return;
-    copyText(copyBtn.getAttribute("data-copy") || "");
+    copyText(copyBtn.getAttribute("data-copy") || "").then((ok) => {
+      if (ok) toast("คัดลอกแล้ว", "ok");
+    });
   });
 
   document.querySelectorAll("[data-user-filter]").forEach((btn) => {
     btn.addEventListener("click", () => {
       userFilter = btn.getAttribute("data-user-filter") || "all";
+      usersVisibleLimit = USERS_PAGE;
       document.querySelectorAll("[data-user-filter]").forEach((b) => {
-        b.classList.toggle("is-active", b === btn);
+        const on = b === btn;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
       });
       renderUsers();
     });
   });
 
-  $("users-search")?.addEventListener("input", (e) => {
-    userSearch = e.target.value.trim();
+  const onUsersSearch = debounce((value) => {
+    userSearch = value.trim();
+    usersVisibleLimit = USERS_PAGE;
     renderUsers();
+  }, 150);
+
+  $("users-search")?.addEventListener("input", (e) => {
+    const v = e.target.value;
+    $("users-search-clear")?.toggleAttribute("hidden", !v);
+    onUsersSearch(v);
+  });
+
+  $("users-search-clear")?.addEventListener("click", () => {
+    if ($("users-search")) $("users-search").value = "";
+    $("users-search-clear")?.setAttribute("hidden", "");
+    userSearch = "";
+    usersVisibleLimit = USERS_PAGE;
+    renderUsers();
+    $("users-search")?.focus();
   });
 
   $("users-sort")?.addEventListener("change", (e) => {
@@ -1673,10 +2252,70 @@
     renderUsers();
   });
 
+  $("users-table")?.querySelector("thead")?.addEventListener("click", (e) => {
+    const th = e.target.closest("th[data-sort-key]");
+    if (!th) return;
+    const key = th.getAttribute("data-sort-key");
+    if (key === "name") userSort = "name_asc";
+    else if (key === "created") {
+      userSort = userSort === "created_desc" ? "created_asc" : "created_desc";
+    } else if (key === "expires") {
+      userSort = userSort === "expires_asc" ? "expires_desc" : "expires_asc";
+    }
+    renderUsers();
+  });
+
+  $("users-table")?.querySelector("thead")?.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const th = e.target.closest("th[data-sort-key]");
+    if (!th) return;
+    e.preventDefault();
+    th.click();
+  });
+
+  $("users-more-btn")?.addEventListener("click", () => {
+    usersVisibleLimit += USERS_PAGE;
+    renderUsers();
+  });
+
   $("export-csv-btn")?.addEventListener("click", () => exportUsersCsv());
 
-  $("audit-search")?.addEventListener("input", () => paintAuditList());
+  const onAuditSearch = debounce(() => paintAuditList(), 150);
+  $("audit-search")?.addEventListener("input", (e) => {
+    $("audit-search-clear")?.toggleAttribute("hidden", !e.target.value);
+    onAuditSearch();
+  });
+  $("audit-search-clear")?.addEventListener("click", () => {
+    if ($("audit-search")) $("audit-search").value = "";
+    $("audit-search-clear")?.setAttribute("hidden", "");
+    paintAuditList();
+    $("audit-search")?.focus();
+  });
   $("audit-filter")?.addEventListener("change", () => paintAuditList());
+
+  $("cmd-open-btn")?.addEventListener("click", openCommandPalette);
+  $("cmd-backdrop")?.addEventListener("click", closeCommandPalette);
+  $("cmd-input")?.addEventListener("input", (e) => {
+    cmdItems = buildCmdItems(e.target.value);
+    cmdActiveIndex = 0;
+    paintCmdList();
+  });
+  $("cmd-list")?.addEventListener("click", (e) => {
+    const item = e.target.closest("[data-cmd-index]");
+    if (!item) return;
+    runCmdItem(Number(item.getAttribute("data-cmd-index")));
+  });
+
+  $("density-btn")?.addEventListener("click", () => {
+    const compact = !dash?.classList.contains("density-compact");
+    applyDensity(compact ? "compact" : "comfortable");
+  });
+
+  try {
+    applyDensity(localStorage.getItem(DENSITY_KEY) === "compact" ? "compact" : "comfortable");
+  } catch (_) {
+    applyDensity("comfortable");
+  }
 
   document.querySelectorAll("[data-cashier-tab]").forEach((btn) => {
     btn.addEventListener("click", () =>
@@ -1695,8 +2334,11 @@
     }
     if (action === "users-expire") {
       userFilter = "active";
+      usersVisibleLimit = USERS_PAGE;
       document.querySelectorAll("[data-user-filter]").forEach((b) => {
-        b.classList.toggle("is-active", b.getAttribute("data-user-filter") === "active");
+        const on = b.getAttribute("data-user-filter") === "active";
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
       });
       showView("users");
       renderUsers();
@@ -1731,7 +2373,7 @@
 
   $("login-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    $("login-btn").disabled = true;
+    setBtnLoading($("login-btn"), true);
     setStatus($("login-status"), "กำลังเข้าสู่ระบบ…", "muted");
     try {
       await ensureApiReady();
@@ -1755,13 +2397,17 @@
       if (error) throw error;
       accessToken = data.access_token;
       persistSessionToken(data.session_token || null);
-      setStatus($("login-status"), "", "muted");
+      if ($("login-status")) {
+        $("login-status").textContent = "";
+        $("login-status").className = "status muted";
+      }
       await showDash(data.profile);
+      toast("เข้าสู่ระบบแล้ว", "ok");
     } catch (err) {
       setStatus($("login-status"), err.message || String(err), "err");
       showLogin();
     } finally {
-      $("login-btn").disabled = false;
+      setBtnLoading($("login-btn"), false);
     }
   });
 
@@ -1782,6 +2428,7 @@
   $("refresh-audit-btn")?.addEventListener("click", () => loadAudit());
 
   $("save-settings-btn")?.addEventListener("click", async () => {
+    setBtnLoading($("save-settings-btn"), true);
     setStatus($("settings-status"), "กำลังบันทึก…", "muted");
     try {
       await api("/api/admin/settings", {
@@ -1795,6 +2442,8 @@
       await Promise.all([loadSettings(), loadAudit()]);
     } catch (err) {
       setStatus($("settings-status"), err.message || String(err), "err");
+    } finally {
+      setBtnLoading($("save-settings-btn"), false);
     }
   });
 
@@ -1871,7 +2520,7 @@
 
   $("create-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    $("create-btn").disabled = true;
+    setBtnLoading($("create-btn"), true);
     setStatus($("create-status"), "กำลังสร้าง…", "muted");
     try {
       const username = $("create-user").value.trim();
@@ -1912,7 +2561,7 @@
     } catch (err) {
       setStatus($("create-status"), err.message || String(err), "err");
     } finally {
-      $("create-btn").disabled = false;
+      setBtnLoading($("create-btn"), false);
     }
   });
 
@@ -1934,7 +2583,7 @@
 
   $("extend-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    $("extend-btn").disabled = true;
+    setBtnLoading($("extend-btn"), true);
     setStatus($("extend-status"), "กำลังต่ออายุ…", "muted");
     try {
       const username = $("extend-q").value.trim();
@@ -1975,7 +2624,7 @@
     } catch (err) {
       setStatus($("extend-status"), err.message || String(err), "err");
     } finally {
-      $("extend-btn").disabled = false;
+      setBtnLoading($("extend-btn"), false);
     }
   });
 
@@ -1993,7 +2642,7 @@
       danger: true,
     });
     if (!confirmed) return;
-    $("revoke-btn").disabled = true;
+    setBtnLoading($("revoke-btn"), true);
     try {
       const data = await applyRentalChange({ username, revoke: true });
       const u = data.user || { username };
@@ -2003,7 +2652,7 @@
     } catch (err) {
       setStatus($("extend-status"), err.message || String(err), "err");
     } finally {
-      $("revoke-btn").disabled = false;
+      setBtnLoading($("revoke-btn"), false);
     }
   });
 
@@ -2013,7 +2662,7 @@
       setStatus($("expires-status"), "ใส่ชื่อผู้ใช้ก่อน", "err");
       return;
     }
-    $("set-expires-btn").disabled = true;
+    setBtnLoading($("set-expires-btn"), true);
     setStatus($("expires-status"), "กำลังตั้งวันหมดอายุ…", "muted");
     try {
       const expiresAtIso = parseDatetimeLocal($("extend-expires-at")?.value);
@@ -2039,7 +2688,7 @@
     } catch (err) {
       setStatus($("expires-status"), err.message || String(err), "err");
     } finally {
-      $("set-expires-btn").disabled = false;
+      setBtnLoading($("set-expires-btn"), false);
     }
   });
 
