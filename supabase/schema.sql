@@ -5,6 +5,7 @@
 -- Roles: admin | normal
 -- No self-registration — admin creates users via Edge admin-register (day rental)
 -- PC entitlement: is_permanent OR (expires_at > now()); banned_at blocks access
+-- Web entitlement: rental_is_permanent OR (rental_expires_at > now()) — separate from PC
 -- token_balance remains for legacy web topup (not PC rental focus)
 
 -- ---------------------------------------------------------------------------
@@ -34,7 +35,9 @@ alter table public.profiles
     check (token_balance >= 0),
   add column if not exists is_permanent boolean not null default false,
   add column if not exists expires_at timestamptz null,
-  add column if not exists banned_at timestamptz null;
+  add column if not exists banned_at timestamptz null,
+  add column if not exists rental_expires_at timestamptz null,
+  add column if not exists rental_is_permanent boolean not null default false;
 
 create index if not exists profiles_expires_at_idx
   on public.profiles (expires_at)

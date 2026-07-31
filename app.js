@@ -341,8 +341,14 @@
 
   function expiryAt(u) {
     if (!u) return null;
-    if (adminMode === "web") return u.rental_expires_at ?? u.expires_at ?? null;
-    return u.expires_at ?? u.rental_expires_at ?? null;
+    if (adminMode === "web") return u.rental_expires_at ?? null;
+    return u.expires_at ?? null;
+  }
+
+  function isPermanent(u) {
+    if (!u) return false;
+    if (adminMode === "web") return !!u.rental_is_permanent;
+    return !!u.is_permanent;
   }
 
   function enrichUser(row) {
@@ -359,7 +365,7 @@
     if (u.banned_at) {
       return { kind: "banned", label: "ถูกแบน", detail: formatDay(u.banned_at) };
     }
-    if (u.is_permanent) {
+    if (isPermanent(u)) {
       return { kind: "permanent", label: "ถาวร", detail: "ไม่หมดอายุ" };
     }
     const expires = expiryAt(u);
@@ -496,7 +502,7 @@
           id: uid,
           username,
           rental_expires_at: null,
-          is_permanent: false,
+          rental_is_permanent: false,
           ...out,
         },
       };
@@ -511,7 +517,7 @@
         user: {
           id: uid,
           username,
-          is_permanent: false,
+          rental_is_permanent: false,
           rental_expires_at: out.rental_expires_at ?? null,
         },
       };
@@ -526,7 +532,7 @@
         user: {
           id: uid,
           username,
-          is_permanent: true,
+          rental_is_permanent: true,
           rental_expires_at: out.rental_expires_at ?? null,
         },
       };
@@ -553,7 +559,7 @@
         id: uid,
         username,
         rental_expires_at: out.rental_expires_at,
-        is_permanent: !!out.is_permanent,
+        rental_is_permanent: !!out.rental_is_permanent,
       },
     };
   }
@@ -580,7 +586,7 @@
         id: uid,
         username,
         rental_expires_at: out.rental_expires_at ?? expiresAtIso,
-        is_permanent: false,
+        rental_is_permanent: false,
       },
     };
   }
@@ -606,7 +612,7 @@
     let user = {
       id: uid,
       username: created.username || username,
-      is_permanent: false,
+      rental_is_permanent: false,
       rental_expires_at: null,
     };
     if (permanent || hasDuration(duration)) {
@@ -628,7 +634,7 @@
   }
 
   function formatExpiryCell(u) {
-    if (u.is_permanent) return "ถาวร";
+    if (isPermanent(u)) return "ถาวร";
     const exp = expiryAt(u);
     return exp ? formatDay(exp) : "—";
   }
@@ -653,7 +659,7 @@
   }
 
   function isExpiringIn(u, offsetDays) {
-    if (u.is_permanent || u.banned_at) return false;
+    if (isPermanent(u) || u.banned_at) return false;
     const exp = expiryAt(u);
     if (!exp) return false;
     const t = new Date(exp).getTime();
@@ -687,7 +693,7 @@
     const arr = list.slice();
     const expTs = (u) => {
       const e = expiryAt(u);
-      return e ? new Date(e).getTime() : u.is_permanent ? Infinity : 0;
+      return e ? new Date(e).getTime() : isPermanent(u) ? Infinity : 0;
     };
     const createdTs = (u) =>
       u.created_at ? new Date(u.created_at).getTime() : 0;
@@ -736,7 +742,7 @@
         [
           u.username || "",
           u.created_at || "",
-          expiryAt(u) || (u.is_permanent ? "permanent" : ""),
+          expiryAt(u) || (isPermanent(u) ? "permanent" : ""),
           st.label,
           u.role || "normal",
         ]
@@ -934,7 +940,7 @@
             $("extend-lookup-form")?.requestSubmit();
           })
         );
-        if (u.is_permanent) {
+        if (isPermanent(u)) {
           actions.appendChild(
             makeBtn("เอาถาวรออก", "btn btn-ghost btn-sm", () =>
               runDrawerAction(async () => {
@@ -1216,7 +1222,8 @@
       $("overview-mode-hint").textContent =
         (isPc ? "โหมด PC" : "โหมด Web") +
         " · ฟิลด์ " +
-        (isPc ? "expires_at" : "rental_expires_at");
+        (isPc ? "expires_at (PC)" : "rental_expires_at (Web)") +
+        " · ถาวรแยกกัน";
     }
     if ($("cashier-mode-hint")) {
       $("cashier-mode-hint").textContent =
