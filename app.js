@@ -460,6 +460,7 @@
     username,
     userId,
     permanent,
+    unsetPermanent,
     duration,
     revoke,
     freeTrial,
@@ -467,6 +468,9 @@
     if (adminMode === "day") {
       if (revoke) {
         return invokeAdminRental({ action: "revoke", username });
+      }
+      if (unsetPermanent) {
+        return invokeAdminRental({ action: "clear_permanent", username });
       }
       if (permanent) {
         return invokeAdminRental({ action: "make_permanent", username, permanent: true });
@@ -494,6 +498,21 @@
           rental_expires_at: null,
           is_permanent: false,
           ...out,
+        },
+      };
+    }
+
+    if (unsetPermanent) {
+      const out = await api("/api/admin/rental/set-permanent", {
+        method: "POST",
+        body: { user_id: uid, permanent: false },
+      });
+      return {
+        user: {
+          id: uid,
+          username,
+          is_permanent: false,
+          rental_expires_at: out.rental_expires_at ?? null,
         },
       };
     }
@@ -915,11 +934,48 @@
             $("extend-lookup-form")?.requestSubmit();
           })
         );
-        actions.appendChild(
-          makeBtn("ถาวร", "btn btn-ghost btn-sm", () =>
-            runDrawerAction(() => applyRentalChange({ username: u.username, permanent: true }))
-          )
-        );
+        if (u.is_permanent) {
+          actions.appendChild(
+            makeBtn("เอาถาวรออก", "btn btn-ghost btn-sm", () =>
+              runDrawerAction(async () => {
+                const ok = await showConfirmModal({
+                  title: "เอาสิทธิ์ถาวรออก?",
+                  body:
+                    'ยกเลิกสิทธิ์ถาวรของ "' +
+                    (u.username || "") +
+                    '" (ยังคงวันหมดอายุเดิมถ้ามี)',
+                  confirmLabel: "เอาถาวรออก",
+                  cancelLabel: "ยกเลิก",
+                });
+                if (!ok) return false;
+                await applyRentalChange({
+                  username: u.username,
+                  userId: u.id,
+                  unsetPermanent: true,
+                });
+              })
+            )
+          );
+        } else {
+          actions.appendChild(
+            makeBtn("ตั้งถาวร", "btn btn-ghost btn-sm", () =>
+              runDrawerAction(async () => {
+                const ok = await showConfirmModal({
+                  title: "ตั้งถาวร?",
+                  body: 'ตั้ง "' + (u.username || "") + '" เป็นบัญชีถาวร?',
+                  confirmLabel: "ตั้งถาวร",
+                  cancelLabel: "ยกเลิก",
+                });
+                if (!ok) return false;
+                await applyRentalChange({
+                  username: u.username,
+                  userId: u.id,
+                  permanent: true,
+                });
+              })
+            )
+          );
+        }
         actions.appendChild(
           makeBtn(u.banned_at ? "ปลดแบน" : "แบน", "btn btn-ghost btn-sm", () =>
             u.banned_at ? runDrawerBan(false) : runDrawerBan(true)
@@ -972,7 +1028,8 @@
     const u = findUserById(drawerUserId);
     if (!u) return;
     try {
-      await fn();
+      const done = await fn();
+      if (done === false) return;
       await loadUsers();
       openUserDrawer(u.id);
       paintOverviewAlerts();

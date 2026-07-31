@@ -3,7 +3,7 @@
 // verify_jwt=true — caller must send Authorization: Bearer <admin access_token>
 //
 // Body:
-//   action?: "create" | "extend" | "revoke" | "make_permanent"  (default create)
+//   action?: "create" | "extend" | "revoke" | "make_permanent" | "clear_permanent" | "set_expires"  (default create)
 //   username?: string   (preferred for WWDC)
 //   email?: string      (legacy; or derived from username)
 //   password?: string   (create only)
@@ -21,7 +21,7 @@ const corsHeaders: Record<string, string> = {
 
 const SYNTHETIC_EMAIL_DOMAIN = "users.ckr.local";
 
-type Action = "create" | "extend" | "revoke" | "make_permanent" | "set_expires";
+type Action = "create" | "extend" | "revoke" | "make_permanent" | "clear_permanent" | "set_expires";
 
 type Body = {
   action?: string;
@@ -93,6 +93,7 @@ function parseAction(raw: string | undefined): Action {
   if (a === "extend" || a === "renew") return "extend";
   if (a === "revoke" || a === "expire") return "revoke";
   if (a === "make_permanent" || a === "permanent") return "make_permanent";
+  if (a === "clear_permanent" || a === "unset_permanent") return "clear_permanent";
   if (a === "set_expires" || a === "set_expire") return "set_expires";
   return "create";
 }
@@ -205,6 +206,37 @@ Deno.serve(async (req: Request) => {
       return json({
         ok: true,
         action: "set_expires",
+        user: updated,
+      });
+    }
+
+    if (action === "clear_permanent") {
+      const { data: looked, error: lookErr } = await adminClient.rpc(
+        "admin_lookup_user",
+        { p_query: query },
+      );
+      const lookup = looked as Record<string, unknown> | null;
+      if (lookErr || !lookup || lookup.ok !== true) {
+        return json({ ok: false, error: "user_not_found" }, 404);
+      }
+
+      const { data: updated, error: updErr } = await adminClient
+        .from("profiles")
+        .update({ is_permanent: false })
+        .eq("id", lookup.id)
+        .select("id, username, is_permanent, expires_at")
+        .single();
+
+      if (updErr || !updated) {
+        return json(
+          { ok: false, error: "clear_permanent_failed", detail: updErr?.message },
+          500,
+        );
+      }
+
+      return json({
+        ok: true,
+        action: "clear_permanent",
         user: updated,
       });
     }
