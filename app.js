@@ -49,6 +49,30 @@
   let lastAudit = [];
   let stuckCount = 0;
   let settingsCache = {};
+  const FEATURE_LOCK_KEYS = [
+    "partyrun",
+    "heart",
+    "powder",
+    "giftdraw",
+    "upgrade",
+    "cookie",
+    "reroll",
+    "quest",
+    "account",
+    "dstool",
+  ];
+  const FEATURE_LOCK_LABELS = {
+    partyrun: "Party Run",
+    heart: "หัวใจ",
+    powder: "ผง",
+    giftdraw: "เปิดกล่อง",
+    upgrade: "ตีบวก",
+    cookie: "Cookie",
+    reroll: "รีโรล",
+    quest: "เควส",
+    account: "ข้อมูลไอดี",
+    dstool: "ทดสอบเกม",
+  };
   let userFilter = "all";
   let userSort = "created_desc";
   let userSearch = "";
@@ -1116,6 +1140,17 @@
     if (settingsCache.topup_maintenance) {
       alerts.push({ kind: "warn", text: "ปิดเติมเงินอยู่", action: "system" });
     }
+    const locks = settingsCache.feature_locks || {};
+    const lockedNames = Object.keys(locks)
+      .filter((k) => locks[k])
+      .map((k) => FEATURE_LOCK_LABELS[k] || k);
+    if (lockedNames.length) {
+      alerts.push({
+        kind: "warn",
+        text: "ล็อกฟังก์ชัน: " + lockedNames.join(", "),
+        action: "system",
+      });
+    }
     if (adminMode === "web" && stuckCount > 0) {
       alerts.push({
         kind: "danger",
@@ -1721,12 +1756,34 @@
     }
   }
 
+  function readFeatureLocksFromUi() {
+    const out = {};
+    FEATURE_LOCK_KEYS.forEach((k) => {
+      out[k] = false;
+    });
+    document.querySelectorAll("[data-feature-lock]").forEach((el) => {
+      const key = el.getAttribute("data-feature-lock");
+      if (!key || !(key in out)) return;
+      out[key] = !!el.checked;
+    });
+    return out;
+  }
+
+  function paintFeatureLockToggles(locks) {
+    const map = locks && typeof locks === "object" ? locks : {};
+    document.querySelectorAll("[data-feature-lock]").forEach((el) => {
+      const key = el.getAttribute("data-feature-lock");
+      el.checked = !!map[key];
+    });
+  }
+
   async function loadSettings() {
     try {
       const data = await api("/api/admin/settings");
       settingsCache = data;
       if ($("set-farm-maint")) $("set-farm-maint").checked = !!data.farm_maintenance;
       if ($("set-topup-maint")) $("set-topup-maint").checked = !!data.topup_maintenance;
+      paintFeatureLockToggles(data.feature_locks);
       paintOverviewAlerts();
     } catch (_) {}
   }
@@ -2436,6 +2493,7 @@
         body: {
           farm_maintenance: !!$("set-farm-maint")?.checked,
           topup_maintenance: !!$("set-topup-maint")?.checked,
+          feature_locks: readFeatureLocksFromUi(),
         },
       });
       setStatus($("settings-status"), "บันทึกแล้ว", "ok");

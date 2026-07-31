@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260731-ux1" />
+  <link rel="stylesheet" href="./styles.css?v=20260731-flock1" />
 </head>
 <body>
   <!-- LOGIN -->
@@ -325,8 +325,23 @@
             <div class="panel">
               <h3>ปิดปรับปรุง</h3>
               <div class="settings-row">
-                <label class="toggle-field"><input type="checkbox" id="set-farm-maint" /><span>ปิดฟาร์ม</span></label>
+                <label class="toggle-field"><input type="checkbox" id="set-farm-maint" /><span>ปิดฟาร์มทั้งหมด</span></label>
                 <label class="toggle-field"><input type="checkbox" id="set-topup-maint" /><span>ปิดเติมเงิน</span></label>
+              </div>
+              <p class="muted settings-hint">ติ๊ก = ปิดปรับปรุง (ผู้ใช้เห็นไอคอนล็อก + popup)</p>
+              <div class="feature-lock-grid" id="feature-lock-grid" role="group" aria-label="ล็อกฟังก์ชันรายแท็บ">
+                <label class="toggle-field"><input type="checkbox" data-feature-lock="partyrun" /><span>Party Run</span></label>
+                <label class="toggle-field"><input type="checkbox" data-feature-lock="heart" /><span>หัวใจ</span></label>
+                <label class="toggle-field"><input type="checkbox" data-feature-lock="powder" /><span>ผง</span></label>
+                <label class="toggle-field"><input type="checkbox" data-feature-lock="giftdraw" /><span>เปิดกล่อง</span></label>
+                <label class="toggle-field"><input type="checkbox" data-feature-lock="upgrade" /><span>ตีบวก</span></label>
+                <label class="toggle-field"><input type="checkbox" data-feature-lock="cookie" /><span>Cookie</span></label>
+                <label class="toggle-field"><input type="checkbox" data-feature-lock="reroll" /><span>รีโรล</span></label>
+                <label class="toggle-field"><input type="checkbox" data-feature-lock="quest" /><span>เควส</span></label>
+                <label class="toggle-field"><input type="checkbox" data-feature-lock="account" /><span>ข้อมูลไอดี</span></label>
+                <label class="toggle-field"><input type="checkbox" data-feature-lock="dstool" /><span>ทดสอบเกม</span></label>
+              </div>
+              <div class="settings-row settings-actions">
                 <button type="button" class="btn btn-primary btn-sm" id="save-settings-btn">บันทึก</button>
               </div>
               <p id="settings-status" class="status muted" role="status"></p>
@@ -403,6 +418,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260731-ux1"></script>
+  <script src="./app.js?v=20260731-flock1"></script>
 </body>
 </html>
