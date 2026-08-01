@@ -809,16 +809,15 @@
       user_id: uid,
       reason: freeTrial ? "free_trial" : "admin_grant",
     };
-    if (duration.days > 0) {
-      if (duration.hours > 0 || duration.minutes > 0) {
-        throw new Error("โหมด Web ใส่ได้เฉพาะวัน หรือ ชม. (อย่างใดอย่างหนึ่ง)");
-      }
-      body.days = duration.days;
-    } else {
-      const totalHours = duration.hours + (duration.minutes > 0 ? 1 : 0);
-      if (totalHours < 1) throw new Error("ต้องระบุอย่างน้อย 1 วัน หรือ 1 ชม.");
-      body.hours = Math.min(8760, totalHours);
+    const days = Math.max(0, Math.floor(Number(duration?.days) || 0));
+    const hours = Math.max(0, Math.floor(Number(duration?.hours) || 0));
+    const minutes = Math.max(0, Math.floor(Number(duration?.minutes) || 0));
+    if (days < 1 && hours < 1 && minutes < 1) {
+      throw new Error("ต้องระบุอย่างน้อย 1 นาที / 1 ชม. / 1 วัน");
     }
+    if (days > 0) body.days = days;
+    if (hours > 0) body.hours = hours;
+    if (minutes > 0) body.minutes = minutes;
 
     const out = await api("/api/admin/rental/grant", { method: "POST", body });
     return {
