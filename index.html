@@ -4,14 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>CKR Admin Console</title>
-  <meta name="description" content="CKR WWDC Admin — เช่าวัน PC / Web" />
+  <meta name="description" content="CKR WWDC Admin — เช่าวัน PC / Powder / Web" />
   <meta name="color-scheme" content="dark" />
   <meta name="theme-color" content="#000000" />
   <link rel="icon" href="assets/logo_4k.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260731-flock1" />
+  <link rel="stylesheet" href="./styles.css?v=20260803-powder1" />
 </head>
 <body>
   <!-- LOGIN -->
@@ -21,7 +21,7 @@
         <img src="assets/logo_4k.png" width="44" height="44" alt="" />
         <div>
           <h1>CKR Admin</h1>
-          <p>จัดการเช่าวัน PC &amp; Web</p>
+          <p>จัดการเช่าวัน PC, Powder &amp; Web</p>
         </div>
       </div>
       <form id="login-form" autocomplete="on">
@@ -91,6 +91,7 @@
         </div>
         <div class="mode-switch" role="group" aria-label="โหมด">
           <button type="button" class="mode-btn is-active" data-mode="day" id="mode-day">PC</button>
+          <button type="button" class="mode-btn" data-mode="powder" id="mode-powder">Powder</button>
           <button type="button" class="mode-btn" data-mode="web" id="mode-web">Web</button>
         </div>
         <div class="topbar-right">
@@ -418,6 +419,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260801-rental2"></script>
+  <script src="./app.js?v=20260803-powder1"></script>
 </body>
 </html>

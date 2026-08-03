@@ -1,9 +1,10 @@
-// Admin day-rental: create / extend / revoke / make_permanent.
+// Admin day-rental: create / extend / revoke / make_permanent (PC or Powder).
 // Uses service role for Auth + profiles. Never expose service_role to the browser.
 // verify_jwt=true — caller must send Authorization: Bearer <admin access_token>
 //
 // Body:
 //   action?: "create" | "extend" | "revoke" | "make_permanent" | "clear_permanent" | "set_expires"  (default create)
+//   product?: "pc" | "powder"  (default pc; legacy "pc_powder" → powder)
 //   username?: string   (preferred for WWDC)
 //   email?: string      (legacy; or derived from username)
 //   password?: string   (create only)
@@ -21,10 +22,19 @@ const corsHeaders: Record<string, string> = {
 
 const SYNTHETIC_EMAIL_DOMAIN = "users.ckr.local";
 
-type Action = "create" | "extend" | "revoke" | "make_permanent" | "clear_permanent" | "set_expires";
+type Action =
+  | "create"
+  | "extend"
+  | "revoke"
+  | "make_permanent"
+  | "clear_permanent"
+  | "set_expires";
+
+type Product = "pc" | "powder";
 
 type Body = {
   action?: string;
+  product?: string;
   email?: string;
   username?: string;
   password?: string;
@@ -35,6 +45,15 @@ type Body = {
   permanent?: boolean;
   role?: string;
   expires_at?: string;
+};
+
+type ProfileRow = {
+  id: string;
+  username: string | null;
+  is_permanent: boolean;
+  expires_at: string | null;
+  powder_is_permanent: boolean;
+  powder_expires_at: string | null;
 };
 
 function json(body: unknown, status = 200) {
@@ -57,6 +76,12 @@ function sanitizeUsername(raw: string): string {
 function syntheticEmail(username: string): string {
   const sanitized = sanitizeUsername(username);
   return `${sanitized}@${SYNTHETIC_EMAIL_DOMAIN}`;
+}
+
+function parseProduct(raw: string | undefined): Product {
+  const p = String(raw || "pc").trim().toLowerCase();
+  if (p === "powder" || p === "pc_powder") return "powder";
+  return "pc";
 }
 
 function parseDuration(body: Body) {
@@ -96,6 +121,31 @@ function parseAction(raw: string | undefined): Action {
   if (a === "clear_permanent" || a === "unset_permanent") return "clear_permanent";
   if (a === "set_expires" || a === "set_expire") return "set_expires";
   return "create";
+}
+
+function profileSelectFields() {
+  return "id, username, is_permanent, expires_at, powder_is_permanent, powder_expires_at";
+}
+
+function userPayload(row: ProfileRow, product: Product) {
+  const base = {
+    id: row.id,
+    username: row.username,
+    powder_is_permanent: row.powder_is_permanent,
+    powder_expires_at: row.powder_expires_at ?? null,
+  };
+  if (product === "powder") {
+    return {
+      ...base,
+      is_permanent: row.powder_is_permanent,
+      expires_at: row.powder_expires_at ?? null,
+    };
+  }
+  return {
+    ...base,
+    is_permanent: row.is_permanent,
+    expires_at: row.expires_at ?? null,
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -151,6 +201,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const action = parseAction(body.action);
+  const product = parseProduct(body.product);
   const usernameRaw = String(body.username || "").trim();
   const emailRaw = String(body.email || "").trim().toLowerCase();
   const permanent = Boolean(body.permanent);
@@ -186,14 +237,16 @@ Deno.serve(async (req: Request) => {
         return json({ ok: false, error: "user_not_found" }, 404);
       }
 
+      const patch =
+        product === "powder"
+          ? { powder_is_permanent: false, powder_expires_at: exp.toISOString() }
+          : { is_permanent: false, expires_at: exp.toISOString() };
+
       const { data: updated, error: updErr } = await adminClient
         .from("profiles")
-        .update({
-          is_permanent: false,
-          expires_at: exp.toISOString(),
-        })
+        .update(patch)
         .eq("id", lookup.id)
-        .select("id, username, is_permanent, expires_at")
+        .select(profileSelectFields())
         .single();
 
       if (updErr || !updated) {
@@ -206,7 +259,8 @@ Deno.serve(async (req: Request) => {
       return json({
         ok: true,
         action: "set_expires",
-        user: updated,
+        product,
+        user: userPayload(updated as ProfileRow, product),
       });
     }
 
@@ -220,11 +274,16 @@ Deno.serve(async (req: Request) => {
         return json({ ok: false, error: "user_not_found" }, 404);
       }
 
+      const patch =
+        product === "powder"
+          ? { powder_is_permanent: false }
+          : { is_permanent: false };
+
       const { data: updated, error: updErr } = await adminClient
         .from("profiles")
-        .update({ is_permanent: false })
+        .update(patch)
         .eq("id", lookup.id)
-        .select("id, username, is_permanent, expires_at")
+        .select(profileSelectFields())
         .single();
 
       if (updErr || !updated) {
@@ -237,14 +296,16 @@ Deno.serve(async (req: Request) => {
       return json({
         ok: true,
         action: "clear_permanent",
-        user: updated,
+        product,
+        user: userPayload(updated as ProfileRow, product),
       });
     }
 
     const { data: rpcData, error: rpcErr } = await adminClient.rpc(
-      "admin_extend_rental",
+      "admin_extend_rental_product",
       {
         p_username: query,
+        p_product: product,
         p_days: duration.days,
         p_hours: duration.hours,
         p_minutes: duration.minutes,
@@ -268,15 +329,20 @@ Deno.serve(async (req: Request) => {
       return json({ ok: false, error: reason }, status);
     }
 
+    const row: ProfileRow = {
+      id: String(result.id),
+      username: (result.username as string | null) ?? null,
+      is_permanent: Boolean(result.is_permanent),
+      expires_at: (result.expires_at as string | null) ?? null,
+      powder_is_permanent: Boolean(result.powder_is_permanent),
+      powder_expires_at: (result.powder_expires_at as string | null) ?? null,
+    };
+
     return json({
       ok: true,
       action: result.action || action,
-      user: {
-        id: result.id,
-        username: result.username,
-        is_permanent: result.is_permanent,
-        expires_at: result.expires_at ?? null,
-      },
+      product,
+      user: userPayload(row, product),
     });
   }
 
@@ -337,20 +403,30 @@ Deno.serve(async (req: Request) => {
   }
 
   const userId = created.user.id;
-  let expiresAt: string | null = null;
+  let entitlementExpires: string | null = null;
   if (!permanent) {
-    expiresAt = new Date(Date.now() + durationMs(duration)).toISOString();
+    entitlementExpires = new Date(Date.now() + durationMs(duration)).toISOString();
   }
 
   const patch: Record<string, unknown> = {
     role,
-    is_permanent: permanent,
-    expires_at: expiresAt,
     email,
   };
   if (username) {
     patch.username = username;
     patch.display_name = username;
+  }
+
+  if (product === "powder") {
+    patch.is_permanent = false;
+    patch.expires_at = null;
+    patch.powder_is_permanent = permanent;
+    patch.powder_expires_at = entitlementExpires;
+  } else {
+    patch.is_permanent = permanent;
+    patch.expires_at = entitlementExpires;
+    patch.powder_is_permanent = false;
+    patch.powder_expires_at = null;
   }
 
   const { error: updErr } = await adminClient
@@ -366,16 +442,23 @@ Deno.serve(async (req: Request) => {
     );
   }
 
+  const row: ProfileRow = {
+    id: userId,
+    username: username || null,
+    is_permanent: product === "pc" ? permanent : false,
+    expires_at: product === "pc" ? entitlementExpires : null,
+    powder_is_permanent: product === "powder" ? permanent : false,
+    powder_expires_at: product === "powder" ? entitlementExpires : null,
+  };
+
   return json({
     ok: true,
     action: "create",
+    product,
     user: {
-      id: userId,
+      ...userPayload(row, product),
       email,
-      username: username || null,
       role,
-      is_permanent: permanent,
-      expires_at: expiresAt,
     },
   });
 });

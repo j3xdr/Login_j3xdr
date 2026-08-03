@@ -5,6 +5,7 @@
 -- Roles: admin | normal
 -- No self-registration — admin creates users via Edge admin-register (day rental)
 -- PC entitlement: is_permanent OR (expires_at > now()); banned_at blocks access
+-- Powder entitlement: powder_is_permanent OR (powder_expires_at > now()) — separate from PC
 -- Web entitlement: rental_is_permanent OR (rental_expires_at > now()) — separate from PC
 -- token_balance remains for legacy web topup (not PC rental focus)
 
@@ -37,7 +38,13 @@ alter table public.profiles
   add column if not exists expires_at timestamptz null,
   add column if not exists banned_at timestamptz null,
   add column if not exists rental_expires_at timestamptz null,
-  add column if not exists rental_is_permanent boolean not null default false;
+  add column if not exists rental_is_permanent boolean not null default false,
+  add column if not exists powder_is_permanent boolean not null default false,
+  add column if not exists powder_expires_at timestamptz null;
+
+create index if not exists profiles_powder_expires_at_idx
+  on public.profiles (powder_expires_at)
+  where powder_expires_at is not null;
 
 create index if not exists profiles_expires_at_idx
   on public.profiles (expires_at)
@@ -342,6 +349,8 @@ begin
     'token_balance', p.token_balance,
     'is_permanent', p.is_permanent,
     'expires_at', p.expires_at,
+    'powder_is_permanent', p.powder_is_permanent,
+    'powder_expires_at', p.powder_expires_at,
     'banned_at', p.banned_at,
     'created_at', p.created_at
   )
@@ -532,6 +541,191 @@ $$;
 revoke all on function public.admin_extend_rental(text, integer, integer, integer, integer, boolean, boolean) from public;
 grant execute on function public.admin_extend_rental(text, integer, integer, integer, integer, boolean, boolean) to authenticated;
 grant execute on function public.admin_extend_rental(text, integer, integer, integer, integer, boolean, boolean) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Product-scoped rental helpers (PC vs Powder)
+-- ---------------------------------------------------------------------------
+create or replace function public.admin_extend_rental_product(
+  p_username text,
+  p_product text default 'pc',
+  p_days integer default 0,
+  p_hours integer default 0,
+  p_minutes integer default 0,
+  p_seconds integer default 0,
+  p_permanent boolean default false,
+  p_revoke boolean default false
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  q text := lower(trim(coalesce(p_username, '')));
+  prod text := lower(trim(coalesce(p_product, 'pc')));
+  jwt_role text := coalesce(auth.role(), '');
+  caller uuid := auth.uid();
+  row_rec public.profiles%rowtype;
+  days_i integer := greatest(coalesce(p_days, 0), 0);
+  hours_i integer := greatest(coalesce(p_hours, 0), 0);
+  minutes_i integer := greatest(coalesce(p_minutes, 0), 0);
+  seconds_i integer := greatest(coalesce(p_seconds, 0), 0);
+  delta interval;
+  base_ts timestamptz;
+  next_exp timestamptz;
+  cur_permanent boolean;
+  cur_expires timestamptz;
+begin
+  if jwt_role = 'service_role' then
+    null;
+  elsif caller is not null and public.is_admin() then
+    null;
+  else
+    return jsonb_build_object('ok', false, 'reason', 'admin_only');
+  end if;
+
+  if length(q) < 2 then
+    return jsonb_build_object('ok', false, 'reason', 'username_too_short');
+  end if;
+
+  if prod = 'pc_powder' then
+    prod := 'powder';
+  end if;
+  if prod not in ('pc', 'powder') then
+    return jsonb_build_object('ok', false, 'reason', 'invalid_product');
+  end if;
+
+  select * into row_rec
+  from public.profiles p
+  where lower(coalesce(p.username, '')) = q
+     or lower(coalesce(p.email, '')) = q
+  order by case when lower(coalesce(p.username, '')) = q then 0 else 1 end
+  limit 1;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'reason', 'user_not_found');
+  end if;
+
+  if prod = 'powder' then
+    cur_permanent := coalesce(row_rec.powder_is_permanent, false);
+    cur_expires := row_rec.powder_expires_at;
+  else
+    cur_permanent := coalesce(row_rec.is_permanent, false);
+    cur_expires := row_rec.expires_at;
+  end if;
+
+  if p_revoke then
+    if prod = 'powder' then
+      update public.profiles
+      set powder_is_permanent = false,
+          powder_expires_at = now()
+      where id = row_rec.id
+      returning * into row_rec;
+    else
+      update public.profiles
+      set is_permanent = false,
+          expires_at = now()
+      where id = row_rec.id
+      returning * into row_rec;
+    end if;
+
+    return jsonb_build_object(
+      'ok', true,
+      'action', 'revoke',
+      'product', prod,
+      'id', row_rec.id,
+      'username', row_rec.username,
+      'is_permanent', row_rec.is_permanent,
+      'expires_at', row_rec.expires_at,
+      'powder_is_permanent', row_rec.powder_is_permanent,
+      'powder_expires_at', row_rec.powder_expires_at
+    );
+  end if;
+
+  if p_permanent then
+    if prod = 'powder' then
+      update public.profiles
+      set powder_is_permanent = true,
+          powder_expires_at = null
+      where id = row_rec.id
+      returning * into row_rec;
+    else
+      update public.profiles
+      set is_permanent = true,
+          expires_at = null
+      where id = row_rec.id
+      returning * into row_rec;
+    end if;
+
+    return jsonb_build_object(
+      'ok', true,
+      'action', 'make_permanent',
+      'product', prod,
+      'id', row_rec.id,
+      'username', row_rec.username,
+      'is_permanent', row_rec.is_permanent,
+      'expires_at', row_rec.expires_at,
+      'powder_is_permanent', row_rec.powder_is_permanent,
+      'powder_expires_at', row_rec.powder_expires_at
+    );
+  end if;
+
+  if days_i = 0 and hours_i = 0 and minutes_i = 0 and seconds_i = 0 then
+    return jsonb_build_object('ok', false, 'reason', 'rental_duration_required');
+  end if;
+
+  delta := make_interval(
+    days => days_i,
+    hours => hours_i,
+    mins => minutes_i,
+    secs => seconds_i
+  );
+
+  if cur_permanent then
+    base_ts := now();
+  elsif cur_expires is not null and cur_expires > now() then
+    base_ts := cur_expires;
+  else
+    base_ts := now();
+  end if;
+
+  next_exp := base_ts + delta;
+
+  if prod = 'powder' then
+    update public.profiles
+    set powder_is_permanent = false,
+        powder_expires_at = next_exp
+    where id = row_rec.id
+    returning * into row_rec;
+  else
+    update public.profiles
+    set is_permanent = false,
+        expires_at = next_exp
+    where id = row_rec.id
+    returning * into row_rec;
+  end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'action', 'extend',
+    'product', prod,
+    'id', row_rec.id,
+    'username', row_rec.username,
+    'is_permanent', row_rec.is_permanent,
+    'expires_at', row_rec.expires_at,
+    'powder_is_permanent', row_rec.powder_is_permanent,
+    'powder_expires_at', row_rec.powder_expires_at,
+    'added_days', days_i,
+    'added_hours', hours_i,
+    'added_minutes', minutes_i,
+    'added_seconds', seconds_i
+  );
+end;
+$$;
+
+revoke all on function public.admin_extend_rental_product(text, text, integer, integer, integer, integer, boolean, boolean) from public;
+grant execute on function public.admin_extend_rental_product(text, text, integer, integer, integer, integer, boolean, boolean) to authenticated;
+grant execute on function public.admin_extend_rental_product(text, text, integer, integer, integer, integer, boolean, boolean) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- RLS

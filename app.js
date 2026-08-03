@@ -1,4 +1,4 @@
-/* CKR Admin Console — POS dashboard (PC + Web rental days) */
+/* CKR Admin Console — POS dashboard (PC + Powder + Web rental days) */
 (function () {
   "use strict";
 
@@ -38,7 +38,9 @@
   let adminMode = (() => {
     try {
       const m = localStorage.getItem(MODE_KEY);
-      return m === "web" || m === "token" ? "web" : "day";
+      if (m === "web" || m === "token") return "web";
+      if (m === "powder") return "powder";
+      return "day";
     } catch (_) {
       return "day";
     }
@@ -606,16 +608,38 @@
     return "เหลือ " + parts.join(" ");
   }
 
-  function expiryAt(u) {
+  function isEdgeRentalMode() {
+    return adminMode === "day" || adminMode === "powder";
+  }
+
+  function rentalProduct() {
+    return adminMode === "powder" ? "powder" : "pc";
+  }
+
+  function expiryAtForProduct(u, product) {
     if (!u) return null;
-    if (adminMode === "web") return u.rental_expires_at ?? null;
+    if (product === "web") return u.rental_expires_at ?? null;
+    if (product === "powder") return u.powder_expires_at ?? null;
     return u.expires_at ?? null;
   }
 
-  function isPermanent(u) {
+  function isPermanentForProduct(u, product) {
     if (!u) return false;
-    if (adminMode === "web") return !!u.rental_is_permanent;
+    if (product === "web") return !!u.rental_is_permanent;
+    if (product === "powder") return !!u.powder_is_permanent;
     return !!u.is_permanent;
+  }
+
+  function expiryAt(u) {
+    if (adminMode === "web") return expiryAtForProduct(u, "web");
+    if (adminMode === "powder") return expiryAtForProduct(u, "powder");
+    return expiryAtForProduct(u, "pc");
+  }
+
+  function isPermanent(u) {
+    if (adminMode === "web") return isPermanentForProduct(u, "web");
+    if (adminMode === "powder") return isPermanentForProduct(u, "powder");
+    return isPermanentForProduct(u, "pc");
   }
 
   function enrichUser(row) {
@@ -660,6 +684,34 @@
     });
   }
 
+  function formatProductExpiry(u, product) {
+    if (isPermanentForProduct(u, product)) return "ถาวร";
+    const exp = expiryAtForProduct(u, product);
+    return exp ? formatDay(exp) : "—";
+  }
+
+  function otherProductHints(u) {
+    const hints = [];
+    if (adminMode !== "day") {
+      const exp = expiryAtForProduct(u, "pc");
+      const perm = isPermanentForProduct(u, "pc");
+      if (perm || exp) hints.push("PC: " + formatProductExpiry(u, "pc"));
+    }
+    if (adminMode !== "powder") {
+      const exp = expiryAtForProduct(u, "powder");
+      const perm = isPermanentForProduct(u, "powder");
+      if (perm || exp) hints.push("Powder: " + formatProductExpiry(u, "powder"));
+    }
+    if (adminMode !== "web") {
+      const exp = expiryAtForProduct(u, "web");
+      const perm = isPermanentForProduct(u, "web");
+      if (perm || exp) hints.push("Web: " + formatProductExpiry(u, "web"));
+    }
+    return hints.length
+      ? ' <span class="muted">(' + escapeHtml(hints.join(" · ")) + ")</span>"
+      : "";
+  }
+
   function describeRentalUser(u) {
     const st = rentalStatus(u);
     return (
@@ -670,6 +722,7 @@
       (st.detail && st.detail !== "—"
         ? ' <span class="muted">(' + escapeHtml(st.detail) + ")</span>"
         : "") +
+      otherProductHints(u) +
       " · บทบาท: " +
       escapeHtml(u.role || "normal")
     );
@@ -738,7 +791,7 @@
     revoke,
     freeTrial,
   }) {
-    if (adminMode === "day") {
+    if (isEdgeRentalMode()) {
       if (revoke) {
         return invokeAdminRental({ action: "revoke", username });
       }
@@ -833,7 +886,7 @@
   async function setRentalExpiresAt({ username, userId, expiresAtIso }) {
     if (!expiresAtIso) throw new Error("expires_at_required");
 
-    if (adminMode === "day") {
+    if (isEdgeRentalMode()) {
       const data = await invokeAdminRental({
         action: "set_expires",
         username,
@@ -858,7 +911,7 @@
   }
 
   async function createAccount({ username, password, permanent, duration, freeTrial }) {
-    if (adminMode === "day") {
+    if (isEdgeRentalMode()) {
       return invokeAdminRental({
         action: "create",
         username,
@@ -1533,7 +1586,7 @@
     }
     try {
       let row = null;
-      if (adminMode === "day") {
+      if (isEdgeRentalMode()) {
         const { data, error } = await sb.rpc("admin_lookup_user", { p_query: q });
         if (!error && data?.ok) row = data;
       }
@@ -1556,7 +1609,9 @@
   }
 
   async function invokeAdminRental(body) {
-    const { data, error } = await sb.functions.invoke(EDGE_ADMIN_FN, { body });
+    const { data, error } = await sb.functions.invoke(EDGE_ADMIN_FN, {
+      body: { product: rentalProduct(), ...body },
+    });
     if (error) {
       let detail = error.message || "edge_invoke_failed";
       try {
@@ -1605,28 +1660,38 @@
 
   /* ---- Mode / View ---- */
   function setMode(mode) {
-    adminMode = mode === "web" || mode === "token" ? "web" : "day";
+    if (mode === "web" || mode === "token") adminMode = "web";
+    else if (mode === "powder") adminMode = "powder";
+    else adminMode = "day";
     try {
       localStorage.setItem(MODE_KEY, adminMode);
     } catch (_) {}
     dash?.classList.toggle("mode-day", adminMode === "day");
+    dash?.classList.toggle("mode-powder", adminMode === "powder");
     dash?.classList.toggle("mode-web", adminMode === "web");
     $("mode-day")?.classList.toggle("is-active", adminMode === "day");
+    $("mode-powder")?.classList.toggle("is-active", adminMode === "powder");
     $("mode-web")?.classList.toggle("is-active", adminMode === "web");
-    const isPc = adminMode === "day";
+    const modeLabels = { day: "PC", powder: "Powder", web: "Web" };
+    const fieldHints = {
+      day: "expires_at (PC)",
+      powder: "powder_expires_at (Powder)",
+      web: "rental_expires_at (Web)",
+    };
     if ($("overview-mode-hint")) {
       $("overview-mode-hint").textContent =
-        (isPc ? "โหมด PC" : "โหมด Web") +
+        "โหมด " +
+        modeLabels[adminMode] +
         " · ฟิลด์ " +
-        (isPc ? "expires_at (PC)" : "rental_expires_at (Web)") +
+        fieldHints[adminMode] +
         " · ถาวรแยกกัน";
     }
     if ($("cashier-mode-hint")) {
       $("cashier-mode-hint").textContent =
-        "เปิดสิทธิ์วันใช้งาน (" + (isPc ? "PC" : "Web") + ")";
+        "เปิดสิทธิ์วันใช้งาน (" + modeLabels[adminMode] + ")";
     }
     if ($("sidebar-mode-label")) {
-      $("sidebar-mode-label").textContent = isPc ? "PC" : "Web";
+      $("sidebar-mode-label").textContent = modeLabels[adminMode];
     }
     loadUsers();
     paintKpis();
@@ -1867,7 +1932,7 @@
     if (cards) cards.innerHTML = skeletonHtml("cards");
     try {
       let users = null;
-      if (adminMode === "day") {
+      if (isEdgeRentalMode()) {
         try {
           const { data, error } = await sb.rpc("admin_list_profiles");
           if (!error && Array.isArray(data)) users = data;
@@ -2058,7 +2123,15 @@
       { id: "cmd-users", label: "ไปหน้าผู้ใช้", meta: "นำทาง", run: () => showView("users") },
       { id: "cmd-overview", label: "ไปหน้าภาพรวม", meta: "นำทาง", run: () => showView("overview") },
       { id: "cmd-system", label: "ไปหน้าระบบ", meta: "นำทาง", run: () => showView("system") },
-      { id: "cmd-mode", label: "สลับโหมด PC / Web", meta: "โหมด", run: () => setMode(adminMode === "day" ? "web" : "day") },
+      {
+        id: "cmd-mode",
+        label: "สลับโหมด PC / Powder / Web",
+        meta: "โหมด",
+        run: () =>
+          setMode(
+            adminMode === "day" ? "powder" : adminMode === "powder" ? "web" : "day"
+          ),
+      },
       { id: "cmd-refresh", label: "รีเฟรชข้อมูล", meta: "ระบบ", run: () => Promise.all([loadUsers(), loadStats(), loadAudit(), loadStuckTopups(), loadSettings()]) },
     ];
     cmds.forEach((c) => {
@@ -2179,6 +2252,7 @@
   });
 
   $("mode-day")?.addEventListener("click", () => setMode("day"));
+  $("mode-powder")?.addEventListener("click", () => setMode("powder"));
   $("mode-web")?.addEventListener("click", () => setMode("web"));
 
   function onUserRowActivate(el) {
