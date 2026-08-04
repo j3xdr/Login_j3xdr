@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260803-powder1" />
+  <link rel="stylesheet" href="./styles.css?v=20260804-shopproxy" />
 </head>
 <body>
   <!-- LOGIN -->
@@ -347,6 +347,25 @@
               </div>
               <p id="settings-status" class="status muted" role="status"></p>
             </div>
+            <div class="panel">
+              <div class="panel-head-row">
+                <h3>Proxy ร้าน</h3>
+                <span id="proxy-status-badge" class="proxy-badge is-unknown" role="status">กำลังตรวจ…</span>
+              </div>
+              <p class="muted settings-hint">Webshare rotating — กด Apply เพื่อบันทึกและทดสอบจากเซิร์ฟเวอร์</p>
+              <p class="muted" id="proxy-current-masked" style="margin:0 0 8px;word-break:break-all;">ปัจจุบัน: —</p>
+              <label class="field" for="admin-proxy-url">
+                <span>PROXY URL</span>
+                <input id="admin-proxy-url" type="password" autocomplete="off" spellcheck="false" placeholder="http://user:pass@host:port" />
+              </label>
+              <div class="settings-row settings-actions" style="margin-top:10px;">
+                <button type="button" class="btn btn-primary btn-sm" id="proxy-apply-btn">Apply</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="proxy-check-btn">ตรวจสถานะ</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="proxy-show-btn" title="แสดง/ซ่อน URL">แสดง</button>
+              </div>
+              <p id="proxy-pool-line" class="muted settings-hint" style="margin-top:8px;">Pool: —</p>
+              <p id="proxy-status" class="status muted" role="status"></p>
+            </div>
             <div class="panel mode-web-only">
               <div class="panel-head-row">
                 <h3>เติมค้าง / ตามมือ</h3>
@@ -419,6 +438,10 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
+<<<<<<< HEAD
   <script src="./app.js?v=20260803-powder1"></script>
+=======
+  <script src="./app.js?v=20260804-shopproxy"></script>
+>>>>>>> 7f6211b (Add shop proxy Apply panel with live status badge.)
 </body>
 </html>

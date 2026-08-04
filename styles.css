@@ -892,6 +892,59 @@ input:focus, .select-input:focus, .prompt-input:focus {
 .feature-lock-grid .toggle-field { margin: 0; }
 .settings-actions { margin-top: 4px; }
 
+.proxy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--muted);
+}
+.proxy-badge.is-ready {
+  color: var(--ok);
+  border-color: rgba(52, 199, 89, 0.4);
+  background: rgba(52, 199, 89, 0.12);
+}
+.proxy-badge.is-warn {
+  color: #ffd60a;
+  border-color: rgba(255, 214, 10, 0.35);
+  background: rgba(255, 214, 10, 0.1);
+}
+.proxy-badge.is-off {
+  color: var(--danger);
+  border-color: rgba(255, 69, 58, 0.35);
+  background: rgba(255, 69, 58, 0.1);
+}
+.proxy-badge.is-unknown {
+  color: var(--muted);
+}
+
+.panel .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.panel .field > span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.panel .field input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  padding: 10px 12px;
+  font: inherit;
+}
+
 .audit-toolbar {
   display: grid;
   grid-template-columns: 1fr auto;

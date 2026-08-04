@@ -1849,7 +1849,127 @@
       if ($("set-topup-maint")) $("set-topup-maint").checked = !!data.topup_maintenance;
       paintFeatureLockToggles(data.feature_locks);
       paintOverviewAlerts();
+      loadAdminProxy().catch(() => {});
     } catch (_) {}
+  }
+
+  function paintProxyBadge(state, label) {
+    const badge = $("proxy-status-badge");
+    if (!badge) return;
+    badge.className = "proxy-badge is-" + (state || "unknown");
+    badge.textContent = label || "—";
+  }
+
+  function paintAdminProxy(data) {
+    if (!data) return;
+    const masked = $("proxy-current-masked");
+    if (masked) {
+      const src = data.source ? " · " + data.source : "";
+      masked.textContent =
+        "ปัจจุบัน: " + (data.proxy_url_masked || "ยังไม่ตั้ง") + src;
+    }
+    const pool = data.pool || {};
+    const poolLine = $("proxy-pool-line");
+    if (poolLine) {
+      if (pool.usage_available && pool.used_pct != null) {
+        poolLine.textContent =
+          "Pool: ใช้ไป " +
+          Number(pool.used_pct).toFixed(1) +
+          "% · " +
+          (pool.detail || "");
+      } else {
+        poolLine.textContent = "Pool: " + (pool.detail || "ยังไม่มีสถิติ bandwidth");
+      }
+    }
+    const check = data.check;
+    if (data.ready || (check && check.ok)) {
+      const ips = (check && check.exit_ips) || [];
+      const rot = check && check.rotating ? " · rotating" : "";
+      paintProxyBadge("ready", "พร้อมใช้งาน" + rot);
+      setStatus(
+        $("proxy-status"),
+        ips.filter(Boolean).length
+          ? "exit IP: " + ips.filter(Boolean).join(" → ")
+          : "Proxy พร้อมใช้งาน",
+        "ok"
+      );
+    } else if (data.configured) {
+      paintProxyBadge("warn", "ตั้งแล้ว · ยังไม่ผ่านตรวจ");
+      const err = (check && (check.error || check.detail)) || "ยังไม่ได้ตรวจ";
+      setStatus($("proxy-status"), err, "err");
+    } else {
+      paintProxyBadge("off", "ยังไม่พร้อม");
+      setStatus($("proxy-status"), "ยังไม่ได้ตั้ง proxy", "muted");
+    }
+  }
+
+  async function loadAdminProxy() {
+    paintProxyBadge("unknown", "กำลังตรวจ…");
+    try {
+      const data = await api("/api/admin/proxy");
+      paintAdminProxy(data);
+      return data;
+    } catch (err) {
+      paintProxyBadge("off", "โหลดไม่สำเร็จ");
+      setStatus($("proxy-status"), err.message || String(err), "err");
+      return null;
+    }
+  }
+
+  async function applyAdminProxy() {
+    const input = $("admin-proxy-url");
+    const url = String(input?.value || "").trim();
+    if (!/^https?:\/\//i.test(url)) {
+      setStatus($("proxy-status"), "รูปแบบไม่ถูกต้อง — ต้องขึ้นต้นด้วย http:// หรือ https://", "err");
+      paintProxyBadge("off", "URL ไม่ถูกต้อง");
+      return;
+    }
+    setBtnLoading($("proxy-apply-btn"), true);
+    paintProxyBadge("unknown", "กำลัง Apply…");
+    setStatus($("proxy-status"), "บันทึกและทดสอบ proxy…", "muted");
+    try {
+      const data = await api("/api/admin/proxy", {
+        method: "POST",
+        body: { proxy_url: url, check: true },
+      });
+      paintAdminProxy(data);
+      if (data.ready || data.check?.ok) {
+        toast("Apply proxy สำเร็จ", "ok");
+        if (input) input.value = "";
+      } else {
+        toast("บันทึกแล้วแต่ทดสอบไม่ผ่าน", "err");
+      }
+      await loadAudit().catch(() => {});
+    } catch (err) {
+      paintProxyBadge("off", "Apply ไม่สำเร็จ");
+      setStatus($("proxy-status"), err.message || String(err), "err");
+    } finally {
+      setBtnLoading($("proxy-apply-btn"), false);
+    }
+  }
+
+  async function checkAdminProxy() {
+    setBtnLoading($("proxy-check-btn"), true);
+    paintProxyBadge("unknown", "กำลังตรวจ…");
+    try {
+      const [check, cur] = await Promise.all([
+        api("/api/admin/heart/proxy-check"),
+        api("/api/admin/proxy").catch(() => null),
+      ]);
+      paintAdminProxy({
+        configured: !!(check.proxy_configured ?? cur?.configured),
+        ready: !!check.ok,
+        proxy_url_masked: check.proxy_url_masked || cur?.proxy_url_masked,
+        source: check.source || cur?.source,
+        pool: cur?.pool,
+        check,
+      });
+    } catch (err) {
+      paintProxyBadge("off", "ตรวจไม่สำเร็จ");
+      setStatus($("proxy-status"), err.message || String(err), "err");
+    } finally {
+      setBtnLoading($("proxy-check-btn"), false);
+    }
   }
 
   function renderUsers(users) {
@@ -2576,6 +2696,17 @@
     } finally {
       setBtnLoading($("save-settings-btn"), false);
     }
+  });
+
+  $("proxy-apply-btn")?.addEventListener("click", () => applyAdminProxy());
+  $("proxy-check-btn")?.addEventListener("click", () => checkAdminProxy());
+  $("proxy-show-btn")?.addEventListener("click", () => {
+    const input = $("admin-proxy-url");
+    const btn = $("proxy-show-btn");
+    if (!input) return;
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    if (btn) btn.textContent = show ? "ซ่อน" : "แสดง";
   });
 
   $("stuck-topups")?.addEventListener("click", async (e) => {
