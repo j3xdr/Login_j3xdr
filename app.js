@@ -1850,6 +1850,7 @@
       paintFeatureLockToggles(data.feature_locks);
       paintOverviewAlerts();
       loadAdminProxy().catch(() => {});
+      loadInvitePoolStats().catch(() => {});
     } catch (_) {}
   }
 
@@ -1900,6 +1901,77 @@
     } else {
       paintProxyBadge("off", "ยังไม่พร้อม");
       setStatus($("proxy-status"), "ยังไม่ได้ตั้ง proxy", "muted");
+    }
+  }
+
+  async function loadInvitePoolStats() {
+    const el = $("invite-pool-stats");
+    try {
+      const data = await api("/api/admin/invite-pool/stats");
+      if (el) {
+        el.textContent =
+          "Ready: " +
+          (data.ready ?? "—") +
+          " · Links: " +
+          (data.links_available ?? "—") +
+          " · Reserved: " +
+          (data.reserved ?? 0) +
+          " · Spent: " +
+          (data.spent ?? 0) +
+          " · (" +
+          (data.guests_per_link || 29) +
+          " guest/link)";
+      }
+      return data;
+    } catch (err) {
+      if (el) el.textContent = "โหลดสถิติไม่สำเร็จ";
+      setStatus($("invite-pool-status"), err.message || String(err), "err");
+      return null;
+    }
+  }
+
+  async function mergeInvitePool() {
+    const status = $("invite-pool-status");
+    let raw = null;
+    const text = String($("invite-pool-text")?.value || "").trim();
+    const file = $("invite-pool-file")?.files?.[0];
+    try {
+      if (file) {
+        const fileText = await file.text();
+        raw = JSON.parse(fileText);
+      } else if (text) {
+        raw = JSON.parse(text);
+      } else {
+        setStatus(status, "เลือกไฟล์หรือวาง JSON ก่อน", "err");
+        return;
+      }
+    } catch (err) {
+      setStatus(status, "JSON ไม่ถูกต้อง: " + (err.message || err), "err");
+      return;
+    }
+
+    setBtnLoading($("invite-pool-merge-btn"), true);
+    setStatus(status, "กำลัง merge…", "muted");
+    try {
+      const data = await api("/api/admin/invite-pool/merge", {
+        method: "POST",
+        body: { raw, source_batch: file ? file.name : "paste" },
+      });
+      const inserted = data.inserted ?? 0;
+      const skipped = data.skipped_existing ?? 0;
+      setStatus(
+        status,
+        "เพิ่ม " + inserted + " · ข้ามซ้ำ " + skipped + " · Ready " + (data.ready ?? "—") + " · Links " + (data.links_available ?? "—"),
+        "ok"
+      );
+      toast("Merge Invite Pool สำเร็จ (+" + inserted + ")", "ok");
+      if ($("invite-pool-text")) $("invite-pool-text").value = "";
+      if ($("invite-pool-file")) $("invite-pool-file").value = "";
+      await loadInvitePoolStats();
+    } catch (err) {
+      setStatus(status, err.message || String(err), "err");
+    } finally {
+      setBtnLoading($("invite-pool-merge-btn"), false);
     }
   }
 
@@ -2676,6 +2748,18 @@
   $("refresh-btn")?.addEventListener("click", () => loadUsers());
   $("refresh-stuck-btn")?.addEventListener("click", () => loadStuckTopups());
   $("refresh-audit-btn")?.addEventListener("click", () => loadAudit());
+  $("invite-pool-refresh-btn")?.addEventListener("click", () => loadInvitePoolStats());
+  $("invite-pool-merge-btn")?.addEventListener("click", () => mergeInvitePool());
+  $("invite-pool-file")?.addEventListener("change", async (ev) => {
+    const file = ev.target?.files?.[0];
+    if (!file || !$("invite-pool-text")) return;
+    try {
+      $("invite-pool-text").value = await file.text();
+      setStatus($("invite-pool-status"), "โหลดไฟล์แล้ว — กด Merge เพื่อบันทึก", "muted");
+    } catch (err) {
+      setStatus($("invite-pool-status"), err.message || String(err), "err");
+    }
+  });
 
   $("save-settings-btn")?.addEventListener("click", async () => {
     setBtnLoading($("save-settings-btn"), true);

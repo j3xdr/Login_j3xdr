@@ -368,6 +368,26 @@
             </div>
             <div class="panel mode-web-only">
               <div class="panel-head-row">
+                <h3>Invite Guest Pool</h3>
+                <button type="button" class="btn btn-ghost btn-sm" id="invite-pool-refresh-btn">รีเฟรช</button>
+              </div>
+              <p class="muted settings-hint">อัปโหลด/วาง JSON จาก guest_pool.json — merge รวมเข้า Pool (dedupe ตาม mid)</p>
+              <p id="invite-pool-stats" class="muted settings-hint" style="margin:0 0 8px;">Ready: — · Links: —</p>
+              <label class="field" for="invite-pool-file">
+                <span>ไฟล์ .json</span>
+                <input id="invite-pool-file" type="file" accept=".json,application/json" />
+              </label>
+              <label class="field" for="invite-pool-text">
+                <span>หรือวาง JSON (array)</span>
+                <textarea id="invite-pool-text" rows="8" spellcheck="false" placeholder='[{"mid":"...","guest_secret":"...","lc":{...},"level":5}]'></textarea>
+              </label>
+              <div class="settings-row settings-actions" style="margin-top:10px;">
+                <button type="button" class="btn btn-primary btn-sm" id="invite-pool-merge-btn">Merge เข้า Pool</button>
+              </div>
+              <p id="invite-pool-status" class="status muted" role="status"></p>
+            </div>
+            <div class="panel mode-web-only">
+              <div class="panel-head-row">
                 <h3>เติมค้าง / ตามมือ</h3>
                 <button type="button" class="btn btn-ghost btn-sm" id="refresh-stuck-btn">รีเฟรช</button>
               </div>
