@@ -16,6 +16,7 @@
   --day: #34c759;
   --web: #4f8cff;
   --powder: #d97706;
+  --invite: #e8a317;
   --sidebar-w: 260px;
   --radius: 12px;
   --radius-sm: 10px;
@@ -116,6 +117,7 @@ body.is-locked {
 .pos-shell.mode-day { --accent: var(--day); --accent-dim: rgba(52, 199, 89, 0.12); }
 .pos-shell.mode-powder { --accent: var(--powder); --accent-dim: rgba(217, 119, 6, 0.12); }
 .pos-shell.mode-web { --accent: var(--web); --accent-dim: rgba(79, 140, 255, 0.12); }
+.pos-shell.mode-invite { --accent: var(--invite); --accent-dim: rgba(232, 163, 23, 0.14); }
 .pos-shell.density-compact { --density: 0.85; }
 
 .pos-sidebar {
@@ -528,6 +530,13 @@ input:focus, .select-input:focus, .prompt-input:focus {
 .mode-web-only { display: none; }
 .pos-shell.mode-web .mode-web-only { display: block; }
 .pos-shell.mode-web .kpi-web { display: block; }
+.mode-invite-only { display: none; }
+.pos-shell.mode-invite .mode-invite-only { display: block; }
+.mode-web-or-invite { display: none; }
+.pos-shell.mode-web .mode-web-or-invite,
+.pos-shell.mode-invite .mode-web-or-invite { display: block; }
+.pos-shell.mode-invite .mode-rental-only { display: none; }
+.invite-credit-form { margin-top: 12px; display: grid; gap: 10px; }
 
 .overview-split {
   display: grid;

@@ -40,11 +40,13 @@
       const m = localStorage.getItem(MODE_KEY);
       if (m === "web" || m === "token") return "web";
       if (m === "powder") return "powder";
+      if (m === "invite") return "invite";
       return "day";
     } catch (_) {
       return "day";
     }
   })();
+  let inviteCreditUser = null;
   let currentView = "overview";
   let cachedUsers = [];
   let lastStats = null;
@@ -714,6 +716,10 @@
 
   function describeRentalUser(u) {
     const st = rentalStatus(u);
+    const credit =
+      u && u.invite_credit_balance != null
+        ? " · Invite: " + Number(u.invite_credit_balance || 0) + " Credit"
+        : "";
     return (
       "<strong>" +
       escapeHtml(u.username || "—") +
@@ -723,8 +729,22 @@
         ? ' <span class="muted">(' + escapeHtml(st.detail) + ")</span>"
         : "") +
       otherProductHints(u) +
+      escapeHtml(credit) +
       " · บทบาท: " +
       escapeHtml(u.role || "normal")
+    );
+  }
+
+  function describeInviteCreditUser(u) {
+    const bal = Number(u?.invite_credit_balance || 0) || 0;
+    return (
+      "<strong>" +
+      escapeHtml(u?.username || "—") +
+      "</strong> · Invite Credit: <strong>" +
+      bal +
+      "</strong>" +
+      " · บทบาท: " +
+      escapeHtml(u?.role || "normal")
     );
   }
 
@@ -1662,6 +1682,7 @@
   function setMode(mode) {
     if (mode === "web" || mode === "token") adminMode = "web";
     else if (mode === "powder") adminMode = "powder";
+    else if (mode === "invite") adminMode = "invite";
     else adminMode = "day";
     try {
       localStorage.setItem(MODE_KEY, adminMode);
@@ -1669,29 +1690,39 @@
     dash?.classList.toggle("mode-day", adminMode === "day");
     dash?.classList.toggle("mode-powder", adminMode === "powder");
     dash?.classList.toggle("mode-web", adminMode === "web");
+    dash?.classList.toggle("mode-invite", adminMode === "invite");
     $("mode-day")?.classList.toggle("is-active", adminMode === "day");
     $("mode-powder")?.classList.toggle("is-active", adminMode === "powder");
     $("mode-web")?.classList.toggle("is-active", adminMode === "web");
-    const modeLabels = { day: "PC", powder: "Powder", web: "Web" };
+    $("mode-invite")?.classList.toggle("is-active", adminMode === "invite");
+    const modeLabels = { day: "PC", powder: "Powder", web: "Web", invite: "Invite" };
     const fieldHints = {
       day: "expires_at (PC)",
       powder: "powder_expires_at (Powder)",
       web: "rental_expires_at (Web)",
+      invite: "invite_credit_balance",
     };
     if ($("overview-mode-hint")) {
       $("overview-mode-hint").textContent =
-        "โหมด " +
-        modeLabels[adminMode] +
-        " · ฟิลด์ " +
-        fieldHints[adminMode] +
-        " · ถาวรแยกกัน";
+        adminMode === "invite"
+          ? "โหมด Invite · เพิ่ม/ลด Invite Credit · Guest Pool"
+          : "โหมด " +
+            modeLabels[adminMode] +
+            " · ฟิลด์ " +
+            fieldHints[adminMode] +
+            " · ถาวรแยกกัน";
     }
     if ($("cashier-mode-hint")) {
       $("cashier-mode-hint").textContent =
-        "เปิดสิทธิ์วันใช้งาน (" + modeLabels[adminMode] + ")";
+        adminMode === "invite"
+          ? "เพิ่ม / ลด Invite Credit"
+          : "เปิดสิทธิ์วันใช้งาน (" + modeLabels[adminMode] + ")";
     }
     if ($("sidebar-mode-label")) {
       $("sidebar-mode-label").textContent = modeLabels[adminMode];
+    }
+    if (adminMode === "invite" || adminMode === "web") {
+      loadInvitePoolStats().catch(() => {});
     }
     loadUsers();
     paintKpis();
@@ -2317,12 +2348,28 @@
       { id: "cmd-system", label: "ไปหน้าระบบ", meta: "นำทาง", run: () => showView("system") },
       {
         id: "cmd-mode",
-        label: "สลับโหมด PC / Powder / Web",
+        label: "สลับโหมด PC / Powder / Web / Invite",
         meta: "โหมด",
         run: () =>
           setMode(
-            adminMode === "day" ? "powder" : adminMode === "powder" ? "web" : "day"
+            adminMode === "day"
+              ? "powder"
+              : adminMode === "powder"
+                ? "web"
+                : adminMode === "web"
+                  ? "invite"
+                  : "day"
           ),
+      },
+      {
+        id: "cmd-invite-credit",
+        label: "ปรับ Invite Credit",
+        meta: "แคชเชียร์",
+        run: () => {
+          setMode("invite");
+          showView("cashier");
+          $("invite-credit-q")?.focus();
+        },
       },
       { id: "cmd-refresh", label: "รีเฟรชข้อมูล", meta: "ระบบ", run: () => Promise.all([loadUsers(), loadStats(), loadAudit(), loadStuckTopups(), loadSettings()]) },
     ];
@@ -2446,6 +2493,104 @@
   $("mode-day")?.addEventListener("click", () => setMode("day"));
   $("mode-powder")?.addEventListener("click", () => setMode("powder"));
   $("mode-web")?.addEventListener("click", () => setMode("web"));
+  $("mode-invite")?.addEventListener("click", () => setMode("invite"));
+
+  $("invite-credit-lookup-form")?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const q = String($("invite-credit-q")?.value || "").trim();
+    if (!q) return;
+    try {
+      inviteCreditUser = await lookupUserToBox(q, "invite-credit-result", "invite-credit-q");
+      if ($("invite-credit-result") && inviteCreditUser) {
+        $("invite-credit-result").innerHTML = describeInviteCreditUser(inviteCreditUser);
+      }
+      setStatus($("invite-credit-status"), "", "muted");
+    } catch (err) {
+      inviteCreditUser = null;
+      setStatus($("invite-credit-status"), err.message || String(err), "err");
+    }
+  });
+
+  document.querySelectorAll("[data-invite-delta]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if ($("invite-credit-delta")) {
+        $("invite-credit-delta").value = btn.getAttribute("data-invite-delta") || "14";
+      }
+    });
+  });
+
+  $("invite-credit-form")?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const username = String(
+      inviteCreditUser?.username || $("invite-credit-q")?.value || ""
+    ).trim();
+    const delta = Math.trunc(Number($("invite-credit-delta")?.value || 0));
+    const reason = String($("invite-credit-reason")?.value || "").trim() || "admin_grant";
+    if (!username) {
+      setStatus($("invite-credit-status"), "ค้นหาชื่อผู้ใช้ก่อน", "err");
+      return;
+    }
+    if (!delta) {
+      setStatus($("invite-credit-status"), "ใส่จำนวน Credit ที่ไม่เป็น 0", "err");
+      return;
+    }
+    const confirmed = await showConfirmModal({
+      title: delta > 0 ? "เพิ่ม Invite Credit?" : "ลด Invite Credit?",
+      body:
+        (delta > 0 ? "เพิ่ม +" : "ลด ") +
+        delta +
+        " Credit ให้ " +
+        username +
+        " ?",
+      confirmLabel: "ยืนยัน",
+      cancelLabel: "ยกเลิก",
+      danger: delta < 0,
+    });
+    if (!confirmed) return;
+    setBtnLoading($("invite-credit-grant-btn"), true);
+    try {
+      const data = await api("/api/admin/invite-credit/grant", {
+        method: "POST",
+        body: {
+          username,
+          user_id: inviteCreditUser?.id || undefined,
+          delta,
+          reason,
+        },
+      });
+      inviteCreditUser = {
+        ...(inviteCreditUser || {}),
+        id: data.user_id || inviteCreditUser?.id,
+        username: data.username || username,
+        invite_credit_balance: data.invite_credit_balance,
+      };
+      if ($("invite-credit-result")) {
+        $("invite-credit-result").className = "lookup-box";
+        $("invite-credit-result").innerHTML = describeInviteCreditUser(inviteCreditUser);
+      }
+      setStatus(
+        $("invite-credit-status"),
+        (delta > 0 ? "เพิ่ม +" : "ลด ") +
+          delta +
+          " สำเร็จ · คงเหลือ " +
+          data.invite_credit_balance +
+          " Credit",
+        "ok"
+      );
+      paintReceipt([
+        delta > 0 ? "เพิ่ม Invite Credit" : "ลด Invite Credit",
+        "User: " + (data.username || username),
+        "Delta: " + (delta > 0 ? "+" : "") + delta,
+        "คงเหลือ: " + data.invite_credit_balance + " Credit",
+        "เหตุผล: " + reason,
+      ]);
+      await loadAudit();
+    } catch (err) {
+      setStatus($("invite-credit-status"), err.message || String(err), "err");
+    } finally {
+      setBtnLoading($("invite-credit-grant-btn"), false);
+    }
+  });
 
   function onUserRowActivate(el) {
     if (!el) return;

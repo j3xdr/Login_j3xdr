@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260804-fixlogin1" />
+  <link rel="stylesheet" href="./styles.css?v=20260810-invite2" />
 </head>
 <body>
   <!-- LOGIN -->
@@ -93,6 +93,7 @@
           <button type="button" class="mode-btn is-active" data-mode="day" id="mode-day">PC</button>
           <button type="button" class="mode-btn" data-mode="powder" id="mode-powder">Powder</button>
           <button type="button" class="mode-btn" data-mode="web" id="mode-web">Web</button>
+          <button type="button" class="mode-btn" data-mode="invite" id="mode-invite">Invite</button>
         </div>
         <div class="topbar-right">
           <button type="button" id="cmd-open-btn" class="btn btn-ghost btn-sm cmd-hint-btn" title="ค้นหาด่วน (⌘K)">
@@ -215,6 +216,7 @@
 
           <div class="cashier-grid">
             <div class="cashier-main">
+              <div class="mode-rental-only">
               <div class="tab-bar" role="tablist">
                 <button type="button" class="tab-btn is-active" data-cashier-tab="create" role="tab" aria-selected="true">สร้างใหม่</button>
                 <button type="button" class="tab-btn" data-cashier-tab="extend" role="tab" aria-selected="false">ต่ออายุ</button>
@@ -310,6 +312,39 @@
                 </div>
                 <p id="expires-status" class="status muted" role="status"></p>
               </div>
+              </div>
+
+              <div id="cashier-invite-panel" class="cashier-tab panel mode-invite-only" role="tabpanel">
+                <form id="invite-credit-lookup-form" class="inline-row">
+                  <label class="field grow">
+                    <span>ชื่อผู้ใช้</span>
+                    <input id="invite-credit-q" type="text" required spellcheck="false" autocomplete="off" enterkeyhint="search" />
+                  </label>
+                  <button class="btn btn-ghost" type="submit">ค้นหา</button>
+                </form>
+                <div id="invite-credit-result" class="lookup-box muted">—</div>
+                <form id="invite-credit-form" class="invite-credit-form">
+                  <label class="field">
+                    <span>จำนวน Credit (บวก = เพิ่ม, ลบ = ลด)</span>
+                    <input id="invite-credit-delta" type="number" inputmode="numeric" step="1" value="14" required />
+                  </label>
+                  <div class="pack-row pack-row-wide">
+                    <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="14">+14</button>
+                    <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="28">+28</button>
+                    <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="140">+140</button>
+                    <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="-14">−14</button>
+                    <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="-28">−28</button>
+                  </div>
+                  <label class="field">
+                    <span>เหตุผล</span>
+                    <input id="invite-credit-reason" type="text" maxlength="80" placeholder="เช่น ชดเชย / ปรับยอด" autocomplete="off" />
+                  </label>
+                  <div class="inline-row-actions">
+                    <button class="btn btn-primary" type="submit" id="invite-credit-grant-btn">บันทึก Credit</button>
+                  </div>
+                  <p id="invite-credit-status" class="status muted" role="status"></p>
+                </form>
+              </div>
             </div>
 
             <aside class="panel receipt-panel" aria-live="polite">
@@ -366,7 +401,7 @@
               <p id="proxy-pool-line" class="muted settings-hint" style="margin-top:8px;">Pool: —</p>
               <p id="proxy-status" class="status muted" role="status"></p>
             </div>
-            <div class="panel mode-web-only">
+            <div class="panel mode-web-or-invite">
               <div class="panel-head-row">
                 <h3>Invite Guest Pool</h3>
                 <button type="button" class="btn btn-ghost btn-sm" id="invite-pool-refresh-btn">รีเฟรช</button>
@@ -458,6 +493,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260810-invite1"></script>
+  <script src="./app.js?v=20260810-invite2"></script>
 </body>
 </html>
