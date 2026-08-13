@@ -1961,6 +1961,82 @@
     }
   }
 
+  async function clearInvitePool(scope, force) {
+    const status = $("invite-pool-status");
+    const scopeKey = scope || "ready";
+    const isAll = scopeKey === "all";
+    const stats = await loadInvitePoolStats();
+    const ready = stats?.ready ?? "—";
+    const reserved = stats?.reserved ?? 0;
+
+    if (isAll) {
+      const ok = await showConfirmModal({
+        title: "ล้าง Invite Pool ทั้งหมด?",
+        body:
+          "ลบ guest ทุกสถานะ (ready / spent / invalid" +
+          (force ? " / reserved" : "") +
+          ") — ไม่สามารถกู้คืนได้\nReady: " +
+          ready +
+          " · Reserved: " +
+          reserved,
+        confirmLabel: force ? "ล้างทั้งหมด (บังคับ)" : "ล้างทั้งหมด",
+        danger: true,
+      });
+      if (!ok) return;
+    } else {
+      const ok = await showConfirmModal({
+        title: "ล้าง guest Ready?",
+        body: "ลบ guest ที่พร้อมใช้งาน " + ready + " รายการ — ไม่สามารถกู้คืนได้",
+        confirmLabel: "ล้าง Ready",
+        danger: true,
+      });
+      if (!ok) return;
+    }
+
+    const btnId = isAll ? "invite-pool-clear-all-btn" : "invite-pool-clear-ready-btn";
+    setBtnLoading($(btnId), true);
+    setStatus(status, "กำลังล้าง pool…", "muted");
+    try {
+      const data = await api("/api/admin/invite-pool/clear", {
+        method: "POST",
+        body: { scope: scopeKey, force: Boolean(force) },
+      });
+      const deleted = data.deleted ?? 0;
+      setStatus(
+        status,
+        "ลบ " +
+          deleted +
+          " รายการ · Ready " +
+          (data.ready ?? 0) +
+          " · Links " +
+          (data.links_available ?? 0),
+        "ok"
+      );
+      toast("ล้าง Invite Pool สำเร็จ (−" + deleted + ")", "ok");
+      await loadInvitePoolStats();
+    } catch (err) {
+      const detail = err.data?.detail;
+      if (detail?.code === "reserved_guests" && isAll && !force) {
+        const retry = await showConfirmModal({
+          title: "ยังมี guest Reserved",
+          body:
+            "มี guest ถูกจอง " +
+            (detail.reserved ?? reserved) +
+            " รายการ — ลบต่อ (อาจกระทบงานที่กำลังรัน)?",
+          confirmLabel: "ล้างบังคับ",
+          danger: true,
+        });
+        if (retry) {
+          setBtnLoading($(btnId), false);
+          return clearInvitePool("all", true);
+        }
+      }
+      setStatus(status, err.message || String(err), "err");
+    } finally {
+      setBtnLoading($(btnId), false);
+    }
+  }
+
   async function mergeInvitePool() {
     const status = $("invite-pool-status");
     let raw = null;
@@ -2895,6 +2971,12 @@
   $("refresh-audit-btn")?.addEventListener("click", () => loadAudit());
   $("invite-pool-refresh-btn")?.addEventListener("click", () => loadInvitePoolStats());
   $("invite-pool-merge-btn")?.addEventListener("click", () => mergeInvitePool());
+  $("invite-pool-clear-ready-btn")?.addEventListener("click", () =>
+    clearInvitePool("ready", false)
+  );
+  $("invite-pool-clear-all-btn")?.addEventListener("click", () =>
+    clearInvitePool("all", false)
+  );
   $("invite-pool-file")?.addEventListener("change", async (ev) => {
     const file = ev.target?.files?.[0];
     if (!file || !$("invite-pool-text")) return;
