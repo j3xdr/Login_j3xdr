@@ -326,9 +326,10 @@
                 <form id="invite-credit-form" class="invite-credit-form">
                   <label class="field">
                     <span>จำนวน Credit (บวก = เพิ่ม, ลบ = ลด)</span>
-                    <input id="invite-credit-delta" type="number" inputmode="numeric" step="1" value="14" required />
+                    <input id="invite-credit-delta" type="number" inputmode="decimal" step="0.5" value="14" required />
                   </label>
                   <div class="pack-row pack-row-wide">
+                    <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="0.5">+0.5</button>
                     <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="14">+14</button>
                     <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="28">+28</button>
                     <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="140">+140</button>
@@ -376,6 +377,23 @@
                 <label class="toggle-field"><input type="checkbox" data-feature-lock="quest" /><span>เควส</span></label>
                 <label class="toggle-field"><input type="checkbox" data-feature-lock="account" /><span>ข้อมูลไอดี</span></label>
                 <label class="toggle-field"><input type="checkbox" data-feature-lock="dstool" /><span>ทดสอบเกม</span></label>
+                <label class="toggle-field"><input type="checkbox" data-feature-lock="afterplay_fast" /><span>AfterPlay Fast</span></label>
+                <label class="toggle-field"><input type="checkbox" data-feature-lock="unlock_l" /><span>Unlock L</span></label>
+              </div>
+              <p class="muted settings-hint">ราคา Credit (กระเป๋าเดียวกับเชิญเพื่อน · แอดมินแก้ได้)</p>
+              <div class="settings-row afterplay-price-row">
+                <label class="field">
+                  <span>AfterPlay / รอบ</span>
+                  <input id="set-afterplay-fast-price" type="number" inputmode="decimal" step="0.5" min="0" max="1000" />
+                </label>
+                <label class="field">
+                  <span>Unlock L / ตัว</span>
+                  <input id="set-unlock-l-each" type="number" inputmode="decimal" step="0.5" min="0" max="10000" />
+                </label>
+                <label class="field">
+                  <span>Unlock L ครบ 7</span>
+                  <input id="set-unlock-l-bundle" type="number" inputmode="decimal" step="0.5" min="0" max="10000" />
+                </label>
               </div>
               <div class="settings-row settings-actions">
                 <button type="button" class="btn btn-primary btn-sm" id="save-settings-btn">บันทึก</button>
@@ -495,6 +513,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260810-invite2"></script>
+  <script src="./app.js?v=20260814-afterplay-a1"></script>
 </body>
 </html>

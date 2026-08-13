@@ -64,6 +64,8 @@
     "quest",
     "account",
     "dstool",
+    "afterplay_fast",
+    "unlock_l",
   ];
   const FEATURE_LOCK_LABELS = {
     partyrun: "Party Run",
@@ -76,6 +78,8 @@
     quest: "เควส",
     account: "ข้อมูลไอดี",
     dstool: "ทดสอบเกม",
+    afterplay_fast: "AfterPlay Fast",
+    unlock_l: "Unlock L",
   };
   let userFilter = "all";
   let userSort = "created_desc";
@@ -1879,6 +1883,15 @@
       if ($("set-farm-maint")) $("set-farm-maint").checked = !!data.farm_maintenance;
       if ($("set-topup-maint")) $("set-topup-maint").checked = !!data.topup_maintenance;
       paintFeatureLockToggles(data.feature_locks);
+      if ($("set-afterplay-fast-price") && data.afterplay_fast_credit_per_run != null) {
+        $("set-afterplay-fast-price").value = data.afterplay_fast_credit_per_run;
+      }
+      if ($("set-unlock-l-each") && data.unlock_l_credit_each != null) {
+        $("set-unlock-l-each").value = data.unlock_l_credit_each;
+      }
+      if ($("set-unlock-l-bundle") && data.unlock_l_credit_bundle != null) {
+        $("set-unlock-l-bundle").value = data.unlock_l_credit_bundle;
+      }
       paintOverviewAlerts();
       loadAdminProxy().catch(() => {});
       loadInvitePoolStats().catch(() => {});
@@ -2600,7 +2613,7 @@
     const username = String(
       inviteCreditUser?.username || $("invite-credit-q")?.value || ""
     ).trim();
-    const delta = Math.trunc(Number($("invite-credit-delta")?.value || 0));
+    const delta = Number($("invite-credit-delta")?.value || 0);
     const reason = String($("invite-credit-reason")?.value || "").trim() || "admin_grant";
     if (!username) {
       setStatus($("invite-credit-status"), "ค้นหาชื่อผู้ใช้ก่อน", "err");
@@ -2998,6 +3011,15 @@
           farm_maintenance: !!$("set-farm-maint")?.checked,
           topup_maintenance: !!$("set-topup-maint")?.checked,
           feature_locks: readFeatureLocksFromUi(),
+          ...(Number.isFinite(Number($("set-afterplay-fast-price")?.value))
+            ? { afterplay_fast_credit_per_run: Number($("set-afterplay-fast-price").value) }
+            : {}),
+          ...(Number.isFinite(Number($("set-unlock-l-each")?.value))
+            ? { unlock_l_credit_each: Number($("set-unlock-l-each").value) }
+            : {}),
+          ...(Number.isFinite(Number($("set-unlock-l-bundle")?.value))
+            ? { unlock_l_credit_bundle: Number($("set-unlock-l-bundle").value) }
+            : {}),
         },
       });
       setStatus($("settings-status"), "บันทึกแล้ว", "ok");
