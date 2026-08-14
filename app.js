@@ -2106,6 +2106,9 @@
       if ($("set-afterplay-fast-price") && data.afterplay_fast_credit_per_run != null) {
         $("set-afterplay-fast-price").value = data.afterplay_fast_credit_per_run;
       }
+      if ($("set-afterplay-fast-max-runs") && data.afterplay_fast_max_runs != null) {
+        $("set-afterplay-fast-max-runs").value = data.afterplay_fast_max_runs;
+      }
       if ($("set-unlock-l-each") && data.unlock_l_credit_each != null) {
         $("set-unlock-l-each").value = data.unlock_l_credit_each;
       }
@@ -3314,6 +3317,9 @@
           farm_feature_order: readFeatureOrderFromUi(),
           ...(Number.isFinite(Number($("set-afterplay-fast-price")?.value))
             ? { afterplay_fast_credit_per_run: Number($("set-afterplay-fast-price").value) }
+            : {}),
+          ...(Number.isFinite(Number($("set-afterplay-fast-max-runs")?.value))
+            ? { afterplay_fast_max_runs: Math.max(0, Math.floor(Number($("set-afterplay-fast-max-runs").value))) }
             : {}),
           ...(Number.isFinite(Number($("set-unlock-l-each")?.value))
             ? { unlock_l_credit_each: Number($("set-unlock-l-each").value) }

@@ -374,6 +374,10 @@
                   <input id="set-afterplay-fast-price" type="number" inputmode="decimal" step="0.5" min="0" max="1000" />
                 </label>
                 <label class="field">
+                  <span>เพดานรอบฟาร์มเงิน/XP</span>
+                  <input id="set-afterplay-fast-max-runs" type="number" inputmode="numeric" step="1" min="0" max="100000" placeholder="0 = ไม่จำกัด" />
+                </label>
+                <label class="field">
                   <span>ปลดล็อค L / ตัว</span>
                   <input id="set-unlock-l-each" type="number" inputmode="decimal" step="0.5" min="0" max="10000" />
                 </label>
@@ -382,6 +386,7 @@
                   <input id="set-unlock-l-bundle" type="number" inputmode="decimal" step="0.5" min="0" max="10000" />
                 </label>
               </div>
+              <p class="muted settings-hint">เพดานรอบ: 0 = ไม่จำกัด จนกว่าจะถึงเป้าที่ลูกค้าใส่หรือระบบคำนวณ</p>
               <div class="settings-row settings-actions">
                 <button type="button" class="btn btn-primary btn-sm" id="save-settings-btn">บันทึก</button>
               </div>
@@ -523,6 +528,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260814-nav1"></script>
+  <script src="./app.js?v=20260814-maxruns1"></script>
 </body>
 </html>
