@@ -1234,6 +1234,9 @@
     if (settingsCache.topup_maintenance) {
       alerts.push({ kind: "warn", text: "ปิดเติมเงินอยู่", action: "system" });
     }
+    if (settingsCache.signup_closed) {
+      alerts.push({ kind: "warn", text: "ปิดสมัครผ่านเว็บอยู่", action: "system" });
+    }
     const locks = settingsCache.feature_locks || {};
     const lockedNames = Object.keys(locks)
       .filter((k) => locks[k])
@@ -2099,6 +2102,7 @@
       settingsCache = data;
       if ($("set-farm-maint")) $("set-farm-maint").checked = !!data.farm_maintenance;
       if ($("set-topup-maint")) $("set-topup-maint").checked = !!data.topup_maintenance;
+      if ($("set-signup-closed")) $("set-signup-closed").checked = !!data.signup_closed;
       featureOrderState = normalizeFarmFeatureOrder(data.farm_feature_order);
       paintFeatureOrderList();
       paintFeatureLockToggles(data.feature_locks);
@@ -3313,6 +3317,7 @@
         body: {
           farm_maintenance: !!$("set-farm-maint")?.checked,
           topup_maintenance: !!$("set-topup-maint")?.checked,
+          signup_closed: !!$("set-signup-closed")?.checked,
           feature_locks: readFeatureLocksFromUi(),
           farm_feature_order: readFeatureOrderFromUi(),
           ...(Number.isFinite(Number($("set-afterplay-fast-price")?.value))
