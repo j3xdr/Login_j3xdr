@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260814-nav1" />
+  <link rel="stylesheet" href="./styles.css?v=20260814-apmode1" />
 </head>
 <body>
   <!-- LOGIN -->
@@ -379,6 +379,18 @@
                   <input id="set-afterplay-fast-max-runs" type="number" inputmode="numeric" step="1" min="0" max="100000" placeholder="0 = ไม่จำกัด" />
                 </label>
                 <label class="field">
+                  <span>Episode Box / รอบ</span>
+                  <input id="set-episode-box-price" type="number" inputmode="decimal" step="0.5" min="0" max="1000" />
+                </label>
+                <label class="field">
+                  <span>เพดานรอบ/ด่าน Episode Box</span>
+                  <input id="set-episode-box-max-runs" type="number" inputmode="numeric" step="1" min="0" max="100000" placeholder="50" />
+                </label>
+                <label class="toggle-field">
+                  <input type="checkbox" id="set-episode-box-enabled" checked />
+                  <span>เปิดโหมด Episode Box ในแท็บฟาร์มเงิน/XP</span>
+                </label>
+                <label class="field">
                   <span>ปลดล็อค L / ตัว</span>
                   <input id="set-unlock-l-each" type="number" inputmode="decimal" step="0.5" min="0" max="10000" />
                 </label>
@@ -392,6 +404,81 @@
                 <button type="button" class="btn btn-primary btn-sm" id="save-settings-btn">บันทึก</button>
               </div>
               <p id="settings-status" class="status muted" role="status"></p>
+            </div>
+            <div class="panel" id="afterplay-profile-panel">
+              <h3>โปรไฟล์ ฟาร์มเงิน/XP</h3>
+              <p class="muted settings-hint">ค่าจังหวะ/กล่อง/เหรียญของงานถัดไป · ลูกค้าเว็บไม่เห็นช่องเหล่านี้</p>
+              <div class="tab-bar ap-profile-tabs" role="tablist">
+                <button type="button" class="tab-btn is-active" id="ap-profile-tab-money_xp" data-ap-profile-tab="money_xp" role="tab" aria-selected="true">เงิน/XP</button>
+                <button type="button" class="tab-btn" id="ap-profile-tab-episode_box" data-ap-profile-tab="episode_box" role="tab" aria-selected="false">Episode Box</button>
+              </div>
+              <div id="ap-profile-money_xp" class="ap-profile-pane">
+                <div class="settings-row">
+                  <label class="field"><span>แม่แบบ AfterPlay</span>
+                    <select id="ap-mx-capture">
+                      <option value="highscore_ep1">highscore_ep1</option>
+                      <option value="play10">play10</option>
+                    </select>
+                  </label>
+                  <label class="field"><span>กล่อง (all / best)</span>
+                    <select id="ap-mx-box-pick">
+                      <option value="all">all · ตามลำดับเซิร์ฟ</option>
+                      <option value="best">best · เกรดสูงสุดก่อน</option>
+                    </select>
+                  </label>
+                  <label class="field"><span>กล่อง/รอบ (0 = ตามเซิร์ฟ)</span>
+                    <input id="ap-mx-box-max" type="number" inputmode="numeric" min="0" max="3" step="1" value="0" />
+                  </label>
+                  <label class="field"><span>overlap</span><input id="ap-mx-overlap" type="number" min="1" max="2" step="1" value="2" /></label>
+                  <label class="field"><span>stagger (วิ)</span><input id="ap-mx-stagger" type="number" step="0.1" min="0" max="30" value="0.3" /></label>
+                  <label class="field"><span>spawn_gap (วิ)</span><input id="ap-mx-spawn-gap" type="number" step="0.1" min="0" max="30" value="0.2" /></label>
+                  <label class="field"><span>gate_extra (วิ)</span><input id="ap-mx-gate-extra" type="number" step="0.1" min="0" max="30" value="0" /></label>
+                  <label class="field"><span>beforeplay retry</span><input id="ap-mx-beforeplay-retry" type="number" min="0" max="10" step="1" value="2" /></label>
+                  <label class="field"><span>เหรียญต่ำสุด</span><input id="ap-mx-coin-min" type="number" min="0" max="425000" step="1000" /></label>
+                  <label class="field"><span>เหรียญสูงสุด</span><input id="ap-mx-coin-max" type="number" min="0" max="425000" step="1000" /></label>
+                  <label class="field"><span>XP ต่ำสุด</span><input id="ap-mx-exp-min" type="number" min="0" max="200000" step="1" /></label>
+                  <label class="field"><span>XP สูงสุด</span><input id="ap-mx-exp-max" type="number" min="0" max="200000" step="1" /></label>
+                </div>
+                <div class="settings-row">
+                  <label class="toggle-field"><input type="checkbox" id="ap-mx-claim-box" checked /><span>เคลมกล่อง</span></label>
+                  <label class="toggle-field"><input type="checkbox" id="ap-mx-allow-box" checked /><span>ลูกค้าแก้จำนวนกล่องได้</span></label>
+                  <label class="toggle-field"><input type="checkbox" id="ap-mx-lock-box" /><span>ล็อกจำนวนตามแอดมิน</span></label>
+                  <label class="toggle-field"><input type="checkbox" id="ap-mx-randomize" checked /><span>สุ่มเหรียญ/XP ในช่วง</span></label>
+                  <label class="toggle-field"><input type="checkbox" id="ap-mx-clamp-life" /><span>clamp ตามหัวใจ</span></label>
+                  <label class="toggle-field"><input type="checkbox" id="ap-mx-stop-flag" /><span>หยุดเมื่อ 210</span></label>
+                  <label class="toggle-field"><input type="checkbox" id="ap-mx-strip-treasure" checked /><span>strip treasure</span></label>
+                </div>
+              </div>
+              <div id="ap-profile-episode_box" class="ap-profile-pane" hidden>
+                <div class="settings-row">
+                  <label class="field"><span>กล่อง (all / best)</span>
+                    <select id="ap-eb-box-pick">
+                      <option value="all">all · ตามลำดับเซิร์ฟ</option>
+                      <option value="best">best · เกรดสูงสุดก่อน</option>
+                    </select>
+                  </label>
+                  <label class="field"><span>กล่อง/รอบ (0 = ตามเซิร์ฟ)</span>
+                    <input id="ap-eb-box-max" type="number" inputmode="numeric" min="0" max="3" step="1" value="0" />
+                  </label>
+                  <label class="field"><span>overlap</span><input id="ap-eb-overlap" type="number" min="1" max="2" step="1" value="2" /></label>
+                  <label class="field"><span>gate_extra (วิ)</span><input id="ap-eb-gate-extra" type="number" step="0.1" min="0" max="30" value="0" /></label>
+                  <label class="field"><span>claim_gap (วิ)</span><input id="ap-eb-claim-gap" type="number" step="0.05" min="0" max="5" value="0.15" /></label>
+                  <label class="field"><span>รอบ/ด่านเริ่มต้น</span><input id="ap-eb-default-runs" type="number" min="1" max="100000" step="1" value="5" /></label>
+                </div>
+                <div class="settings-row">
+                  <label class="toggle-field"><input type="checkbox" id="ap-eb-allow-box" checked /><span>ลูกค้าแก้จำนวนกล่องได้</span></label>
+                  <label class="toggle-field"><input type="checkbox" id="ap-eb-lock-box" /><span>ล็อกจำนวนตามแอดมิน</span></label>
+                  <label class="toggle-field"><input type="checkbox" id="ap-eb-clamp-life" checked /><span>clamp ตามหัวใจ</span></label>
+                  <label class="toggle-field"><input type="checkbox" id="ap-eb-stop-flag" /><span>หยุดเมื่อ 210</span></label>
+                  <label class="toggle-field"><input type="checkbox" id="ap-eb-ice" checked /><span>Ice Tower เมื่อเลือก ep5</span></label>
+                  <label class="toggle-field"><input type="checkbox" id="ap-eb-gashapon" disabled /><span>สุ่ม gashapon (บังคับปิด)</span></label>
+                  <label class="toggle-field"><input type="checkbox" id="ap-eb-skip-l" disabled /><span>ข้ามด่านที่มี L (บังคับปิด)</span></label>
+                </div>
+              </div>
+              <div class="settings-row settings-actions">
+                <button type="button" class="btn btn-primary btn-sm" id="save-afterplay-profiles-btn">บันทึกโปรไฟล์</button>
+              </div>
+              <p id="ap-profile-status" class="status muted" role="status"></p>
             </div>
             <div class="panel">
               <h3>เข้าถึงก่อนใคร</h3>
@@ -529,6 +616,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260814-signup1"></script>
+  <script src="./app.js?v=20260814-apmode1"></script>
 </body>
 </html>

@@ -2096,6 +2096,115 @@
     return n ? "บันทึกแล้ว · " + n + " คน" : "บันทึกแล้ว · ไม่มีใครในรายชื่อ";
   }
 
+  function setFieldVal(id, value) {
+    const el = $(id);
+    if (!el || value == null) return;
+    if (el.type === "checkbox") el.checked = !!value;
+    else el.value = value;
+  }
+
+  function numOr(id, fallback) {
+    const n = Number($(id)?.value);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  function paintAfterplayProfiles(data) {
+    const mx = data?.afterplay_profile_money_xp || {};
+    const eb = data?.afterplay_profile_episode_box || {};
+    if ($("ap-mx-capture")) $("ap-mx-capture").value = mx.capture === "play10" ? "play10" : "highscore_ep1";
+    if ($("ap-mx-box-pick")) $("ap-mx-box-pick").value = mx.box_pick === "best" ? "best" : "all";
+    setFieldVal("ap-mx-box-max", mx.box_max == null ? 0 : mx.box_max);
+    setFieldVal("ap-mx-overlap", mx.overlap);
+    setFieldVal("ap-mx-stagger", mx.stagger);
+    setFieldVal("ap-mx-spawn-gap", mx.spawn_gap);
+    setFieldVal("ap-mx-gate-extra", mx.gate_extra);
+    setFieldVal("ap-mx-beforeplay-retry", mx.beforeplay_retry);
+    setFieldVal("ap-mx-coin-min", mx.coin_min);
+    setFieldVal("ap-mx-coin-max", mx.coin_max);
+    setFieldVal("ap-mx-exp-min", mx.exp_min);
+    setFieldVal("ap-mx-exp-max", mx.exp_max);
+    if ($("ap-mx-claim-box")) $("ap-mx-claim-box").checked = mx.claim_box !== false;
+    if ($("ap-mx-allow-box")) $("ap-mx-allow-box").checked = mx.allow_customer_box_max !== false;
+    if ($("ap-mx-lock-box")) $("ap-mx-lock-box").checked = !!mx.lock_box_max;
+    if ($("ap-mx-randomize")) $("ap-mx-randomize").checked = mx.randomize !== false;
+    if ($("ap-mx-clamp-life")) $("ap-mx-clamp-life").checked = !!mx.clamp_to_life;
+    if ($("ap-mx-stop-flag")) $("ap-mx-stop-flag").checked = !!mx.stop_on_flag;
+    if ($("ap-mx-strip-treasure")) $("ap-mx-strip-treasure").checked = mx.strip_treasure !== false;
+    if ($("ap-eb-box-pick")) $("ap-eb-box-pick").value = eb.box_pick === "best" ? "best" : "all";
+    setFieldVal("ap-eb-box-max", eb.box_max == null ? 0 : eb.box_max);
+    setFieldVal("ap-eb-overlap", eb.overlap);
+    setFieldVal("ap-eb-gate-extra", eb.gate_extra);
+    setFieldVal("ap-eb-claim-gap", eb.claim_gap);
+    setFieldVal("ap-eb-default-runs", eb.default_runs_per_ep);
+    if ($("ap-eb-allow-box")) $("ap-eb-allow-box").checked = eb.allow_customer_box_max !== false;
+    if ($("ap-eb-lock-box")) $("ap-eb-lock-box").checked = !!eb.lock_box_max;
+    if ($("ap-eb-clamp-life")) $("ap-eb-clamp-life").checked = eb.clamp_to_life !== false;
+    if ($("ap-eb-stop-flag")) $("ap-eb-stop-flag").checked = !!eb.stop_on_flag;
+    if ($("ap-eb-ice")) $("ap-eb-ice").checked = eb.ice_tower_for_ep5 !== false;
+    if ($("ap-eb-gashapon")) $("ap-eb-gashapon").checked = false;
+    if ($("ap-eb-skip-l")) $("ap-eb-skip-l").checked = false;
+  }
+
+  function readAfterplayProfilesFromUi() {
+    return {
+      afterplay_profile_money_xp: {
+        capture: $("ap-mx-capture")?.value === "play10" ? "play10" : "highscore_ep1",
+        box_pick: $("ap-mx-box-pick")?.value === "best" ? "best" : "all",
+        box_max: Math.max(0, Math.min(3, Math.floor(numOr("ap-mx-box-max", 0)))),
+        overlap: Math.max(1, Math.min(2, Math.floor(numOr("ap-mx-overlap", 2)))),
+        stagger: numOr("ap-mx-stagger", 0.3),
+        spawn_gap: numOr("ap-mx-spawn-gap", 0.2),
+        gate_extra: numOr("ap-mx-gate-extra", 0),
+        beforeplay_retry: Math.max(0, Math.floor(numOr("ap-mx-beforeplay-retry", 2))),
+        coin_min: Math.floor(numOr("ap-mx-coin-min", 350000)),
+        coin_max: Math.floor(numOr("ap-mx-coin-max", 420000)),
+        exp_min: Math.floor(numOr("ap-mx-exp-min", 69000)),
+        exp_max: Math.floor(numOr("ap-mx-exp-max", 79999)),
+        claim_box: !!$("ap-mx-claim-box")?.checked,
+        allow_customer_box_max: !!$("ap-mx-allow-box")?.checked,
+        lock_box_max: !!$("ap-mx-lock-box")?.checked,
+        randomize: !!$("ap-mx-randomize")?.checked,
+        clamp_to_life: !!$("ap-mx-clamp-life")?.checked,
+        stop_on_flag: !!$("ap-mx-stop-flag")?.checked,
+        strip_treasure: !!$("ap-mx-strip-treasure")?.checked,
+      },
+      afterplay_profile_episode_box: {
+        box_pick: $("ap-eb-box-pick")?.value === "best" ? "best" : "all",
+        box_max: Math.max(0, Math.min(3, Math.floor(numOr("ap-eb-box-max", 0)))),
+        overlap: Math.max(1, Math.min(2, Math.floor(numOr("ap-eb-overlap", 2)))),
+        gate_extra: numOr("ap-eb-gate-extra", 0),
+        claim_gap: numOr("ap-eb-claim-gap", 0.15),
+        default_runs_per_ep: Math.max(1, Math.floor(numOr("ap-eb-default-runs", 5))),
+        allow_customer_box_max: !!$("ap-eb-allow-box")?.checked,
+        lock_box_max: !!$("ap-eb-lock-box")?.checked,
+        clamp_to_life: !!$("ap-eb-clamp-life")?.checked,
+        stop_on_flag: !!$("ap-eb-stop-flag")?.checked,
+        ice_tower_for_ep5: !!$("ap-eb-ice")?.checked,
+        allow_gashapon: false,
+        skip_owned_l: false,
+      },
+    };
+  }
+
+  function setApProfileTab(tab) {
+    const mode = tab === "episode_box" ? "episode_box" : "money_xp";
+    document.querySelectorAll("[data-ap-profile-tab]").forEach((btn) => {
+      const on = btn.getAttribute("data-ap-profile-tab") === mode;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    const mx = $("ap-profile-money_xp");
+    const eb = $("ap-profile-episode_box");
+    if (mx) {
+      mx.hidden = mode !== "money_xp";
+      mx.classList.toggle("hidden", mode !== "money_xp");
+    }
+    if (eb) {
+      eb.hidden = mode !== "episode_box";
+      eb.classList.toggle("hidden", mode !== "episode_box");
+    }
+  }
+
   async function loadSettings() {
     try {
       const data = await api("/api/admin/settings");
@@ -2119,6 +2228,16 @@
       if ($("set-unlock-l-bundle") && data.unlock_l_credit_bundle != null) {
         $("set-unlock-l-bundle").value = data.unlock_l_credit_bundle;
       }
+      if ($("set-episode-box-price") && data.afterplay_episode_box_credit_per_run != null) {
+        $("set-episode-box-price").value = data.afterplay_episode_box_credit_per_run;
+      }
+      if ($("set-episode-box-max-runs") && data.afterplay_episode_box_max_runs != null) {
+        $("set-episode-box-max-runs").value = data.afterplay_episode_box_max_runs;
+      }
+      if ($("set-episode-box-enabled")) {
+        $("set-episode-box-enabled").checked = data.afterplay_episode_box_enabled !== false;
+      }
+      paintAfterplayProfiles(data);
       paintOverviewAlerts();
       loadAdminProxy().catch(() => {});
       loadInvitePoolStats().catch(() => {});
@@ -3332,6 +3451,14 @@
           ...(Number.isFinite(Number($("set-unlock-l-bundle")?.value))
             ? { unlock_l_credit_bundle: Number($("set-unlock-l-bundle").value) }
             : {}),
+          ...(Number.isFinite(Number($("set-episode-box-price")?.value))
+            ? { afterplay_episode_box_credit_per_run: Number($("set-episode-box-price").value) }
+            : {}),
+          ...(Number.isFinite(Number($("set-episode-box-max-runs")?.value))
+            ? { afterplay_episode_box_max_runs: Math.max(0, Math.floor(Number($("set-episode-box-max-runs").value))) }
+            : {}),
+          afterplay_episode_box_enabled: !!$("set-episode-box-enabled")?.checked,
+          ...readAfterplayProfilesFromUi(),
         },
       });
       setStatus($("settings-status"), "บันทึกแล้ว", "ok");
@@ -3340,6 +3467,26 @@
       setStatus($("settings-status"), err.message || String(err), "err");
     } finally {
       setBtnLoading($("save-settings-btn"), false);
+    }
+  });
+
+  document.querySelectorAll("[data-ap-profile-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => setApProfileTab(btn.getAttribute("data-ap-profile-tab")));
+  });
+  $("save-afterplay-profiles-btn")?.addEventListener("click", async () => {
+    setBtnLoading($("save-afterplay-profiles-btn"), true);
+    setStatus($("ap-profile-status"), "กำลังบันทึก…", "muted");
+    try {
+      await api("/api/admin/settings", {
+        method: "POST",
+        body: readAfterplayProfilesFromUi(),
+      });
+      setStatus($("ap-profile-status"), "บันทึกโปรไฟล์แล้ว", "ok");
+      await Promise.all([loadSettings(), loadAudit()]);
+    } catch (err) {
+      setStatus($("ap-profile-status"), err.message || String(err), "err");
+    } finally {
+      setBtnLoading($("save-afterplay-profiles-btn"), false);
     }
   });
 

@@ -1016,6 +1016,9 @@ input:focus, .select-input:focus, .prompt-input:focus {
   font-size: 0.88rem;
   line-height: 1.45;
 }
+.ap-profile-tabs { margin: 10px 0 12px; }
+.ap-profile-pane[hidden] { display: none !important; }
+#afterplay-profile-panel .settings-row .field { min-width: 140px; flex: 1 1 160px; }
 
 .audit-toolbar {
   display: grid;
