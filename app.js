@@ -81,6 +81,8 @@
     afterplay_fast: "AfterPlay Fast",
     unlock_l: "Unlock L",
   };
+  let earlyAccessCache = {};
+  let earlyAccessSelectReady = false;
   let userFilter = "all";
   let userSort = "created_desc";
   let userSearch = "";
@@ -1876,6 +1878,71 @@
     });
   }
 
+  function parseUsernameList(text) {
+    return String(text || "")
+      .split(/[\s,;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  function ensureEarlyAccessSelect() {
+    const sel = $("early-access-feature");
+    if (!sel || earlyAccessSelectReady) return sel;
+    sel.innerHTML = "";
+    FEATURE_LOCK_KEYS.forEach((k) => {
+      const opt = document.createElement("option");
+      opt.value = k;
+      opt.textContent = FEATURE_LOCK_LABELS[k] || k;
+      sel.appendChild(opt);
+    });
+    const locks = settingsCache.feature_locks || {};
+    const firstLocked = FEATURE_LOCK_KEYS.find((k) => locks[k]);
+    sel.value = firstLocked || FEATURE_LOCK_KEYS[0];
+    earlyAccessSelectReady = true;
+    return sel;
+  }
+
+  function paintEarlyAccessEditor() {
+    const sel = ensureEarlyAccessSelect();
+    const ta = $("early-access-usernames");
+    const cur = $("early-access-current");
+    const key = sel?.value || FEATURE_LOCK_KEYS[0];
+    const entries = earlyAccessCache[key] || [];
+    const names = entries.map((e) => e.username).filter(Boolean);
+    if (ta) ta.value = names.join("\n");
+    if (cur) {
+      cur.textContent = names.length
+        ? "ปัจจุบัน: " + names.join(", ")
+        : "ปัจจุบัน: ยังไม่มีใคร";
+    }
+  }
+
+  async function loadEarlyAccess() {
+    try {
+      const data = await api("/api/admin/early-access");
+      earlyAccessCache = data.features && typeof data.features === "object" ? data.features : {};
+      paintEarlyAccessEditor();
+    } catch (_) {
+      earlyAccessCache = {};
+      paintEarlyAccessEditor();
+    }
+  }
+
+  async function saveEarlyAccess() {
+    const sel = $("early-access-feature");
+    const feature = sel?.value;
+    if (!feature) throw new Error("เลือกฟีเจอร์ก่อน");
+    const usernames = parseUsernameList($("early-access-usernames")?.value || "");
+    const data = await api("/api/admin/early-access/" + encodeURIComponent(feature), {
+      method: "PUT",
+      body: { usernames },
+    });
+    earlyAccessCache = data.features && typeof data.features === "object" ? data.features : {};
+    paintEarlyAccessEditor();
+    const n = (earlyAccessCache[feature] || []).length;
+    return n ? "บันทึกแล้ว · " + n + " คน" : "บันทึกแล้ว · ไม่มีใครในรายชื่อ";
+  }
+
   async function loadSettings() {
     try {
       const data = await api("/api/admin/settings");
@@ -1883,6 +1950,7 @@
       if ($("set-farm-maint")) $("set-farm-maint").checked = !!data.farm_maintenance;
       if ($("set-topup-maint")) $("set-topup-maint").checked = !!data.topup_maintenance;
       paintFeatureLockToggles(data.feature_locks);
+      loadEarlyAccess().catch(() => {});
       if ($("set-afterplay-fast-price") && data.afterplay_fast_credit_per_run != null) {
         $("set-afterplay-fast-price").value = data.afterplay_fast_credit_per_run;
       }
@@ -2508,6 +2576,15 @@
         },
       },
       { id: "cmd-refresh", label: "รีเฟรชข้อมูล", meta: "ระบบ", run: () => Promise.all([loadUsers(), loadStats(), loadAudit(), loadStuckTopups(), loadSettings()]) },
+      {
+        id: "cmd-early-access",
+        label: "เข้าถึงก่อนใคร",
+        meta: "ระบบ",
+        run: () => {
+          showView("system");
+          $("early-access-feature")?.focus();
+        },
+      },
     ];
     cmds.forEach((c) => {
       if (!query || c.label.toLowerCase().includes(query) || c.meta.toLowerCase().includes(query)) {
@@ -3045,6 +3122,29 @@
       setStatus($("invite-pool-status"), "โหลดไฟล์แล้ว — กด Merge เพื่อบันทึก", "muted");
     } catch (err) {
       setStatus($("invite-pool-status"), err.message || String(err), "err");
+    }
+  });
+
+  $("early-access-feature")?.addEventListener("change", () => {
+    paintEarlyAccessEditor();
+    setStatus($("early-access-status"), "", "muted");
+  });
+  $("save-early-access-btn")?.addEventListener("click", async () => {
+    setBtnLoading($("save-early-access-btn"), true);
+    setStatus($("early-access-status"), "กำลังบันทึก…", "muted");
+    try {
+      const msg = await saveEarlyAccess();
+      setStatus($("early-access-status"), msg, "ok");
+      loadAudit().catch(() => {});
+    } catch (err) {
+      const data = err?.data?.detail;
+      let msg = err.message || String(err);
+      if (data && typeof data === "object" && Array.isArray(data.usernames) && data.usernames.length) {
+        msg = "ไม่พบ username: " + data.usernames.join(", ");
+      }
+      setStatus($("early-access-status"), msg, "err");
+    } finally {
+      setBtnLoading($("save-early-access-btn"), false);
     }
   });
 

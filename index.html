@@ -401,6 +401,23 @@
               <p id="settings-status" class="status muted" role="status"></p>
             </div>
             <div class="panel">
+              <h3>เข้าถึงก่อนใคร</h3>
+              <p class="muted settings-hint">เลือกฟีเจอร์ที่ปิดอยู่ แล้วใส่ username ที่ให้เห็นและใช้ได้ · สิทธิ์ถาวรจนกว่าจะลบชื่อ · ไม่แทนวันเช่าและไม่ให้ Credit ฟรี</p>
+              <label class="field">
+                <span>ฟีเจอร์</span>
+                <select id="early-access-feature" aria-label="เลือกฟีเจอร์เข้าถึงก่อนใคร"></select>
+              </label>
+              <label class="field">
+                <span>Username (บรรทัดละ 1 หรือคั่นด้วยจุลภาค)</span>
+                <textarea id="early-access-usernames" rows="6" placeholder="user1&#10;user2" spellcheck="false"></textarea>
+              </label>
+              <p class="muted" id="early-access-current">ปัจจุบัน: —</p>
+              <div class="settings-row settings-actions">
+                <button type="button" class="btn btn-primary btn-sm" id="save-early-access-btn">บันทึก</button>
+              </div>
+              <p id="early-access-status" class="status muted" role="status"></p>
+            </div>
+            <div class="panel">
               <div class="panel-head-row">
                 <h3>Proxy ร้าน</h3>
                 <span id="proxy-status-badge" class="proxy-badge is-unknown" role="status">กำลังตรวจ…</span>
@@ -519,6 +536,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260814-admin-a1"></script>
+  <script src="./app.js?v=20260814-early1"></script>
 </body>
 </html>
