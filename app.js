@@ -80,7 +80,25 @@
     dstool: "ทดสอบเกม",
     afterplay_fast: "ฟาร์มเงิน/XP",
     unlock_l: "ปลดล็อค L",
+    invite: "เชิญเพื่อน",
   };
+  const DEFAULT_FARM_FEATURE_ORDER = [
+    "partyrun",
+    "heart",
+    "powder",
+    "giftdraw",
+    "upgrade",
+    "cookie",
+    "reroll",
+    "quest",
+    "invite",
+    "afterplay_fast",
+    "unlock_l",
+    "account",
+    "dstool",
+  ];
+  const FEATURE_LOCK_KEY_SET = new Set(FEATURE_LOCK_KEYS);
+  let featureOrderState = DEFAULT_FARM_FEATURE_ORDER.slice();
   let earlyAccessCache = {};
   let earlyAccessSelectReady = false;
   let userFilter = "all";
@@ -1870,8 +1888,142 @@
     return out;
   }
 
+  function normalizeFarmFeatureOrder(raw) {
+    const allowed = new Set(DEFAULT_FARM_FEATURE_ORDER);
+    const seen = new Set();
+    const out = [];
+    (Array.isArray(raw) ? raw : []).forEach((item) => {
+      let k = String(item || "").trim();
+      if (k === "cookie_unlock") k = "cookie";
+      if (!allowed.has(k) || seen.has(k)) return;
+      seen.add(k);
+      out.push(k);
+    });
+    DEFAULT_FARM_FEATURE_ORDER.forEach((k) => {
+      if (!seen.has(k)) out.push(k);
+    });
+    return out;
+  }
+
+  function readFeatureOrderFromUi() {
+    const keys = [...document.querySelectorAll("#feature-order-list [data-feature]")]
+      .map((el) => el.getAttribute("data-feature"))
+      .filter(Boolean);
+    return normalizeFarmFeatureOrder(keys.length ? keys : featureOrderState);
+  }
+
+  function currentLockSnapshot() {
+    const locks = { ...(settingsCache.feature_locks || {}) };
+    document.querySelectorAll("[data-feature-lock]").forEach((el) => {
+      const key = el.getAttribute("data-feature-lock");
+      if (key) locks[key] = !!el.checked;
+    });
+    return locks;
+  }
+
+  function paintFeatureOrderList() {
+    const root = $("feature-order-list");
+    if (!root) return;
+    const locks = currentLockSnapshot();
+    const order = normalizeFarmFeatureOrder(featureOrderState);
+    featureOrderState = order;
+    root.replaceChildren();
+    order.forEach((key, idx) => {
+      const row = document.createElement("div");
+      row.className = "feature-order-row";
+      row.dataset.feature = key;
+      row.setAttribute("role", "listitem");
+      row.draggable = true;
+      const grip = document.createElement("span");
+      grip.className = "feature-order-grip";
+      grip.setAttribute("aria-hidden", "true");
+      grip.textContent = "⋮⋮";
+      const label = document.createElement("span");
+      label.className = "feature-order-label";
+      label.textContent = FEATURE_LOCK_LABELS[key] || key;
+      row.append(grip, label);
+      if (FEATURE_LOCK_KEY_SET.has(key)) {
+        const tog = document.createElement("label");
+        tog.className = "toggle-field";
+        const inp = document.createElement("input");
+        inp.type = "checkbox";
+        inp.setAttribute("data-feature-lock", key);
+        inp.checked = !!locks[key];
+        const span = document.createElement("span");
+        span.textContent = "ปิด";
+        tog.append(inp, span);
+        row.appendChild(tog);
+      } else {
+        const always = document.createElement("span");
+        always.className = "feature-order-always";
+        always.textContent = "เปิดเสมอ";
+        row.appendChild(always);
+      }
+      const move = document.createElement("div");
+      move.className = "feature-order-move";
+      const up = document.createElement("button");
+      up.type = "button";
+      up.textContent = "▲";
+      up.setAttribute("aria-label", "เลื่อนขึ้น");
+      up.disabled = idx === 0;
+      up.addEventListener("click", () => moveFeature(key, -1));
+      const down = document.createElement("button");
+      down.type = "button";
+      down.textContent = "▼";
+      down.setAttribute("aria-label", "เลื่อนลง");
+      down.disabled = idx === order.length - 1;
+      down.addEventListener("click", () => moveFeature(key, 1));
+      move.append(up, down);
+      row.appendChild(move);
+      root.appendChild(row);
+    });
+  }
+
+  function moveFeature(key, dir) {
+    const order = readFeatureOrderFromUi();
+    const from = order.indexOf(key);
+    const to = from + dir;
+    if (from < 0 || to < 0 || to >= order.length) return;
+    const next = order.slice();
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    featureOrderState = next;
+    paintFeatureOrderList();
+  }
+
+  function bindFeatureOrderDrag() {
+    const root = $("feature-order-list");
+    if (!root || root.dataset.dragBound) return;
+    root.dataset.dragBound = "1";
+    let dragging = null;
+    root.addEventListener("dragstart", (ev) => {
+      const row = ev.target.closest(".feature-order-row");
+      if (!row) return;
+      dragging = row;
+      row.classList.add("is-dragging");
+      try {
+        ev.dataTransfer.effectAllowed = "move";
+        ev.dataTransfer.setData("text/plain", row.dataset.feature || "");
+      } catch (_) {}
+    });
+    root.addEventListener("dragend", () => {
+      if (dragging) dragging.classList.remove("is-dragging");
+      dragging = null;
+      featureOrderState = readFeatureOrderFromUi();
+    });
+    root.addEventListener("dragover", (ev) => {
+      ev.preventDefault();
+      const row = ev.target.closest(".feature-order-row");
+      if (!dragging || !row || row === dragging) return;
+      const rect = row.getBoundingClientRect();
+      if (ev.clientY < rect.top + rect.height / 2) root.insertBefore(dragging, row);
+      else root.insertBefore(dragging, row.nextSibling);
+    });
+  }
+
   function paintFeatureLockToggles(locks) {
     const map = locks && typeof locks === "object" ? locks : {};
+    settingsCache.feature_locks = map;
     document.querySelectorAll("[data-feature-lock]").forEach((el) => {
       const key = el.getAttribute("data-feature-lock");
       el.checked = !!map[key];
@@ -1949,6 +2101,8 @@
       settingsCache = data;
       if ($("set-farm-maint")) $("set-farm-maint").checked = !!data.farm_maintenance;
       if ($("set-topup-maint")) $("set-topup-maint").checked = !!data.topup_maintenance;
+      featureOrderState = normalizeFarmFeatureOrder(data.farm_feature_order);
+      paintFeatureOrderList();
       paintFeatureLockToggles(data.feature_locks);
       loadEarlyAccess().catch(() => {});
       if ($("set-afterplay-fast-price") && data.afterplay_fast_credit_per_run != null) {
@@ -3148,6 +3302,7 @@
     }
   });
 
+  bindFeatureOrderDrag();
   $("save-settings-btn")?.addEventListener("click", async () => {
     setBtnLoading($("save-settings-btn"), true);
     setStatus($("settings-status"), "กำลังบันทึก…", "muted");
@@ -3158,6 +3313,7 @@
           farm_maintenance: !!$("set-farm-maint")?.checked,
           topup_maintenance: !!$("set-topup-maint")?.checked,
           feature_locks: readFeatureLocksFromUi(),
+          farm_feature_order: readFeatureOrderFromUi(),
           ...(Number.isFinite(Number($("set-afterplay-fast-price")?.value))
             ? { afterplay_fast_credit_per_run: Number($("set-afterplay-fast-price").value) }
             : {}),

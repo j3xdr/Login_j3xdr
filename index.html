@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260810-invite2" />
+  <link rel="stylesheet" href="./styles.css?v=20260814-order1" />
 </head>
 <body>
   <!-- LOGIN -->
@@ -365,21 +365,8 @@
                 <label class="toggle-field"><input type="checkbox" id="set-farm-maint" /><span>ปิดฟาร์มทั้งหมด</span></label>
                 <label class="toggle-field"><input type="checkbox" id="set-topup-maint" /><span>ปิดเติมเงิน</span></label>
               </div>
-              <p class="muted settings-hint">ติ๊ก = ปิดปรับปรุง (ผู้ใช้เห็นไอคอนล็อก + popup)</p>
-              <div class="feature-lock-grid" id="feature-lock-grid" role="group" aria-label="ล็อกฟังก์ชันรายแท็บ">
-                <label class="toggle-field"><input type="checkbox" data-feature-lock="partyrun" /><span>Party Run</span></label>
-                <label class="toggle-field"><input type="checkbox" data-feature-lock="heart" /><span>หัวใจ</span></label>
-                <label class="toggle-field"><input type="checkbox" data-feature-lock="powder" /><span>ผง</span></label>
-                <label class="toggle-field"><input type="checkbox" data-feature-lock="giftdraw" /><span>เปิดกล่อง</span></label>
-                <label class="toggle-field"><input type="checkbox" data-feature-lock="upgrade" /><span>ตีบวก</span></label>
-                <label class="toggle-field"><input type="checkbox" data-feature-lock="cookie" /><span>Cookie</span></label>
-                <label class="toggle-field"><input type="checkbox" data-feature-lock="reroll" /><span>รีโรล</span></label>
-                <label class="toggle-field"><input type="checkbox" data-feature-lock="quest" /><span>เควส</span></label>
-                <label class="toggle-field"><input type="checkbox" data-feature-lock="account" /><span>ข้อมูลไอดี</span></label>
-                <label class="toggle-field"><input type="checkbox" data-feature-lock="dstool" /><span>ทดสอบเกม</span></label>
-                <label class="toggle-field"><input type="checkbox" data-feature-lock="afterplay_fast" /><span>ฟาร์มเงิน/XP</span></label>
-                <label class="toggle-field"><input type="checkbox" data-feature-lock="unlock_l" /><span>ปลดล็อค L</span></label>
-              </div>
+              <p class="muted settings-hint">ติ๊ก = ปิดปรับปรุง · ลูกศรหรือลากเพื่อเรียงเมนูร้าน (DevPlay อยู่บนสุดเสมอ)</p>
+              <div class="feature-order-list" id="feature-order-list" role="list" aria-label="เรียงลำดับฟีเจอร์ฟาร์ม"></div>
               <p class="muted settings-hint">ราคา Credit (กระเป๋าเดียวกับเชิญเพื่อน · แอดมินแก้ได้)</p>
               <div class="settings-row afterplay-price-row">
                 <label class="field">
@@ -536,6 +523,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260814-farmxp1"></script>
+  <script src="./app.js?v=20260814-order1"></script>
 </body>
 </html>
