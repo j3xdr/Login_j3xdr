@@ -78,8 +78,8 @@
     quest: "เควส",
     account: "ข้อมูลไอดี",
     dstool: "ทดสอบเกม",
-    afterplay_fast: "AfterPlay Fast",
-    unlock_l: "Unlock L",
+    afterplay_fast: "ฟาร์มเงิน/XP",
+    unlock_l: "ปลดล็อค L",
   };
   let earlyAccessCache = {};
   let earlyAccessSelectReady = false;
