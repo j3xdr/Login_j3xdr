@@ -411,8 +411,14 @@
                 <span>PROXY URL</span>
                 <input id="admin-proxy-url" type="password" autocomplete="off" spellcheck="false" placeholder="http://user:pass@host:port" />
               </label>
+              <label class="field" for="admin-webshare-token">
+                <span>WEBSHARE API TOKEN</span>
+                <input id="admin-webshare-token" type="password" autocomplete="off" spellcheck="false" placeholder="Token จาก Webshare → API Keys" />
+              </label>
+              <p class="muted settings-hint" id="webshare-token-masked" style="margin:0 0 8px;">Token ปัจจุบัน: —</p>
               <div class="settings-row settings-actions" style="margin-top:10px;">
-                <button type="button" class="btn btn-primary btn-sm" id="proxy-apply-btn">Apply</button>
+                <button type="button" class="btn btn-primary btn-sm" id="proxy-apply-btn">Apply Proxy</button>
+                <button type="button" class="btn btn-primary btn-sm" id="webshare-token-apply-btn">Apply Token</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="proxy-check-btn">ตรวจสถานะ</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="proxy-show-btn" title="แสดง/ซ่อน URL">แสดง</button>
               </div>
@@ -513,6 +519,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260814-afterplay-a1"></script>
+  <script src="./app.js?v=20260814-admin-a1"></script>
 </body>
 </html>

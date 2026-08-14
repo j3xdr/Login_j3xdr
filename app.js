@@ -1926,6 +1926,12 @@
         poolLine.textContent = "Pool: " + (pool.detail || "ยังไม่มีสถิติ bandwidth");
       }
     }
+    const tokenLine = $("webshare-token-masked");
+    if (tokenLine) {
+      tokenLine.textContent = data.webshare_token_configured
+        ? "Token ปัจจุบัน: " + (data.webshare_token_masked || "ตั้งแล้ว")
+        : "Token ปัจจุบัน: ยังไม่ตั้ง — % Pool จะอ่านจากบัญชีเก่า";
+    }
     const check = data.check;
     if (data.ready || (check && check.ok)) {
       const ips = (check && check.exit_ips) || [];
@@ -2137,6 +2143,47 @@
       setStatus($("proxy-status"), err.message || String(err), "err");
     } finally {
       setBtnLoading($("proxy-apply-btn"), false);
+    }
+  }
+
+  async function applyWebshareToken() {
+    const input = $("admin-webshare-token");
+    const token = String(input?.value || "").trim();
+    if (token.length < 8) {
+      setStatus($("proxy-status"), "ใส่ Webshare API Token ก่อน", "err");
+      return;
+    }
+    setBtnLoading($("webshare-token-apply-btn"), true);
+    setStatus($("proxy-status"), "บันทึก Webshare API Token…", "muted");
+    try {
+      const data = await api("/api/admin/webshare-token", {
+        method: "POST",
+        body: { token },
+      });
+      const proxy = await loadAdminProxy().catch(() => null);
+      const pool = data.pool || proxy?.pool || {};
+      if (pool.usage_available && pool.used_pct != null) {
+        setStatus(
+          $("proxy-status"),
+          "Token ใหม่ · Pool ใช้ไป " + Number(pool.used_pct).toFixed(1) + "%",
+          "ok"
+        );
+        toast("เปลี่ยน Webshare API แล้ว", "ok");
+      } else {
+        setStatus(
+          $("proxy-status"),
+          "บันทึก Token แล้ว · " + (pool.detail || "ยังไม่มีสถิติ"),
+          pool.ok === false ? "err" : "ok"
+        );
+        toast("บันทึก Token แล้ว", "ok");
+      }
+      if (input) input.value = "";
+      await loadAudit().catch(() => {});
+    } catch (err) {
+      setStatus($("proxy-status"), err.message || String(err), "err");
+      toast("บันทึก Token ไม่สำเร็จ", "err");
+    } finally {
+      setBtnLoading($("webshare-token-apply-btn"), false);
     }
   }
 
@@ -3032,13 +3079,16 @@
   });
 
   $("proxy-apply-btn")?.addEventListener("click", () => applyAdminProxy());
+  $("webshare-token-apply-btn")?.addEventListener("click", () => applyWebshareToken());
   $("proxy-check-btn")?.addEventListener("click", () => checkAdminProxy());
   $("proxy-show-btn")?.addEventListener("click", () => {
     const input = $("admin-proxy-url");
+    const tokenInput = $("admin-webshare-token");
     const btn = $("proxy-show-btn");
-    if (!input) return;
-    const show = input.type === "password";
-    input.type = show ? "text" : "password";
+    if (!input && !tokenInput) return;
+    const show = (input || tokenInput).type === "password";
+    if (input) input.type = show ? "text" : "password";
+    if (tokenInput) tokenInput.type = show ? "text" : "password";
     if (btn) btn.textContent = show ? "ซ่อน" : "แสดง";
   });
 
