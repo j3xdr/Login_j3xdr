@@ -80,7 +80,6 @@
     dstool: "ทดสอบเกม",
     afterplay_fast: "ฟาร์มเงิน/XP",
     unlock_l: "ปลดล็อค L",
-    invite: "เชิญเพื่อน",
   };
   const DEFAULT_FARM_FEATURE_ORDER = [
     "partyrun",
@@ -91,7 +90,6 @@
     "cookie",
     "reroll",
     "quest",
-    "invite",
     "afterplay_fast",
     "unlock_l",
     "account",
