@@ -66,6 +66,7 @@
     "dstool",
     "afterplay_fast",
     "unlock_l",
+    "ice_tower",
   ];
   const FEATURE_LOCK_LABELS = {
     partyrun: "Party Run",
@@ -80,6 +81,7 @@
     dstool: "ทดสอบเกม",
     afterplay_fast: "ฟาร์มเงิน/XP",
     unlock_l: "ปลดล็อค L",
+    ice_tower: "Ice Tower",
   };
   const DEFAULT_FARM_FEATURE_ORDER = [
     "partyrun",
@@ -92,6 +94,7 @@
     "quest",
     "afterplay_fast",
     "unlock_l",
+    "ice_tower",
     "account",
     "dstool",
   ];
@@ -2228,6 +2231,24 @@
       if ($("set-unlock-l-bundle") && data.unlock_l_credit_bundle != null) {
         $("set-unlock-l-bundle").value = data.unlock_l_credit_bundle;
       }
+      if ($("set-ice-tower-each") && data.ice_tower_credit_each != null) {
+        $("set-ice-tower-each").value = data.ice_tower_credit_each;
+      }
+      if ($("set-ice-tower-bundle") && data.ice_tower_credit_bundle != null) {
+        $("set-ice-tower-bundle").value = data.ice_tower_credit_bundle;
+      }
+      if ($("set-ice-tower-default-stars") && data.ice_tower_default_stars != null) {
+        $("set-ice-tower-default-stars").value = data.ice_tower_default_stars;
+      }
+      if ($("set-ice-tower-default-floor") && data.ice_tower_default_target_floor != null) {
+        $("set-ice-tower-default-floor").value = data.ice_tower_default_target_floor;
+      }
+      if ($("set-ice-tower-unlock")) {
+        $("set-ice-tower-unlock").checked = data.ice_tower_unlock_if_needed !== false;
+      }
+      if ($("set-ice-tower-allow-map")) {
+        $("set-ice-tower-allow-map").checked = data.ice_tower_allow_customer_star_map !== false;
+      }
       if ($("set-episode-box-price") && data.afterplay_episode_box_credit_per_run != null) {
         $("set-episode-box-price").value = data.afterplay_episode_box_credit_per_run;
       }
@@ -3451,6 +3472,20 @@
           ...(Number.isFinite(Number($("set-unlock-l-bundle")?.value))
             ? { unlock_l_credit_bundle: Number($("set-unlock-l-bundle").value) }
             : {}),
+          ...(Number.isFinite(Number($("set-ice-tower-each")?.value))
+            ? { ice_tower_credit_each: Number($("set-ice-tower-each").value) }
+            : {}),
+          ...(Number.isFinite(Number($("set-ice-tower-bundle")?.value))
+            ? { ice_tower_credit_bundle: Number($("set-ice-tower-bundle").value) }
+            : {}),
+          ...(Number.isFinite(Number($("set-ice-tower-default-stars")?.value))
+            ? { ice_tower_default_stars: Math.max(1, Math.min(3, Math.floor(Number($("set-ice-tower-default-stars").value)))) }
+            : {}),
+          ...(Number.isFinite(Number($("set-ice-tower-default-floor")?.value))
+            ? { ice_tower_default_target_floor: Math.max(1, Math.min(100, Math.floor(Number($("set-ice-tower-default-floor").value)))) }
+            : {}),
+          ice_tower_unlock_if_needed: !!$("set-ice-tower-unlock")?.checked,
+          ice_tower_allow_customer_star_map: !!$("set-ice-tower-allow-map")?.checked,
           ...(Number.isFinite(Number($("set-episode-box-price")?.value))
             ? { afterplay_episode_box_credit_per_run: Number($("set-episode-box-price").value) }
             : {}),
