@@ -2231,6 +2231,9 @@
       if ($("set-unlock-l-bundle") && data.unlock_l_credit_bundle != null) {
         $("set-unlock-l-bundle").value = data.unlock_l_credit_bundle;
       }
+      if ($("set-unlock-l-treasure") && data.unlock_l_treasure_credit != null) {
+        $("set-unlock-l-treasure").value = data.unlock_l_treasure_credit;
+      }
       if ($("set-ice-tower-each") && data.ice_tower_credit_each != null) {
         $("set-ice-tower-each").value = data.ice_tower_credit_each;
       }
@@ -3471,6 +3474,9 @@
             : {}),
           ...(Number.isFinite(Number($("set-unlock-l-bundle")?.value))
             ? { unlock_l_credit_bundle: Number($("set-unlock-l-bundle").value) }
+            : {}),
+          ...(Number.isFinite(Number($("set-unlock-l-treasure")?.value))
+            ? { unlock_l_treasure_credit: Number($("set-unlock-l-treasure").value) }
             : {}),
           ...(Number.isFinite(Number($("set-ice-tower-each")?.value))
             ? { ice_tower_credit_each: Number($("set-ice-tower-each").value) }
