@@ -378,6 +378,7 @@
       signup_closed: !!$(SETTINGS_BOOLEAN_INPUTS.signup_closed)?.checked,
       feature_locks: readFeatureLocksFromUi(),
       farm_feature_order: readFeatureOrderFromUi(),
+      feature_catalog: readFeatureCatalogFromUi(),
       ice_tower_unlock_if_needed: !!$(SETTINGS_BOOLEAN_INPUTS.ice_tower_unlock_if_needed)?.checked,
       ice_tower_allow_customer_star_map: !!$(SETTINGS_BOOLEAN_INPUTS.ice_tower_allow_customer_star_map)?.checked,
       afterplay_episode_box_enabled: !!$(SETTINGS_BOOLEAN_INPUTS.afterplay_episode_box_enabled)?.checked,
@@ -420,15 +421,27 @@
   ];
   const FEATURE_LOCK_LABELS = {
     partyrun: "Party Run",
-    heart: "หัวใจ",
-    powder: "ผง",
-    giftdraw: "เปิดกล่อง",
-    upgrade: "ตีบวก",
-    cookie: "Cookie",
+    heart: "ฟาร์มหัวใจ",
+    powder: "ฟาร์มผง",
+    giftdraw: "Gift Draw",
+    upgrade: "ตีบวกสมบัติ",
+    cookie: "ปลดล็อกคุกกี้",
     afterplay_fast: "ฟาร์มเงิน/XP",
     unlock_l: "ปลดล็อค L",
     ice_tower: "Ice Tower",
   };
+  const DEFAULT_FEATURE_ICONS = {
+    partyrun: "pirate_cookie_run.gif",
+    heart: "Heart.png",
+    powder: "magic_powder.png",
+    giftdraw: "icon_giftpoint.png",
+    upgrade: "Crystal_Pearl_Earring_2B9.png",
+    cookie: "pine_monk_cookie.png",
+    afterplay_fast: "Cookie0023_head.png",
+    unlock_l: "Tiger_Lily_Cookie.png",
+    ice_tower: "ice_tower.png",
+  };
+  const SHOP_ASSET_BASE = "https://crgwwdc.shop/assets/";
   const DEFAULT_FARM_FEATURE_ORDER = [
     "partyrun",
     "heart",
@@ -442,6 +455,7 @@
   ];
   const FEATURE_LOCK_KEY_SET = new Set(FEATURE_LOCK_KEYS);
   let featureOrderState = DEFAULT_FARM_FEATURE_ORDER.slice();
+  let featureCatalogState = {};
   let earlyAccessCache = {};
   let earlyAccessSelectReady = false;
   let userFilter = "all";
@@ -1193,6 +1207,80 @@
       throw err;
     }
     return data;
+  }
+
+  async function apiUpload(path, formData) {
+    if (PREVIEW_MODE) {
+      throw new Error("Local Preview mode — การกระทำจริงถูกปิดไว้");
+    }
+    const headers = {};
+    if (accessToken) headers.Authorization = "Bearer " + accessToken;
+    if (sessionToken) headers["X-Session-Token"] = sessionToken;
+    const res = await fetch(API + path, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (_) {
+      data = null;
+    }
+    if (!res.ok) {
+      const raw = data?.detail || data?.reason || res.statusText;
+      const detail =
+        typeof raw === "string"
+          ? raw
+          : raw && typeof raw === "object"
+            ? raw.code || raw.message || JSON.stringify(raw)
+            : String(raw);
+      const err = new Error(detail);
+      err.status = res.status;
+      err.data = data;
+      throw err;
+    }
+    return data;
+  }
+
+  function resolveFeatureIconUrl(icon) {
+    const raw = String(icon || "").trim();
+    if (!raw) return "";
+    if (/^https?:\/\//i.test(raw)) return raw;
+    if (raw.startsWith("/api/")) return API + raw;
+    const file = raw.replace(/^assets\//, "").split("?")[0];
+    return SHOP_ASSET_BASE + encodeURIComponent(file).replace(/%2F/gi, "/");
+  }
+
+  function normalizeFeatureCatalog(raw) {
+    const out = {};
+    FEATURE_LOCK_KEYS.forEach((key) => {
+      out[key] = {
+        label: FEATURE_LOCK_LABELS[key] || key,
+        icon: DEFAULT_FEATURE_ICONS[key] || "",
+      };
+    });
+    if (!raw || typeof raw !== "object") return out;
+    FEATURE_LOCK_KEYS.forEach((key) => {
+      const item = raw[key];
+      if (!item || typeof item !== "object") return;
+      const label = String(item.label || "").trim();
+      if (label && label.length <= 40) out[key].label = label;
+      const icon = String(item.icon || "").trim();
+      if (icon) out[key].icon = icon;
+    });
+    return out;
+  }
+
+  function readFeatureCatalogFromUi() {
+    const out = normalizeFeatureCatalog(featureCatalogState);
+    document.querySelectorAll("#feature-order-list [data-feature-label]").forEach((el) => {
+      const key = el.getAttribute("data-feature-label");
+      if (!key || !out[key]) return;
+      const label = String(el.value || "").trim();
+      if (label && label.length <= 40) out[key].label = label;
+    });
+    return out;
   }
 
   async function applyRentalChange({
@@ -2345,21 +2433,107 @@
     const locks = currentLockSnapshot();
     const order = normalizeFarmFeatureOrder(featureOrderState);
     featureOrderState = order;
+    featureCatalogState = normalizeFeatureCatalog(featureCatalogState);
     root.replaceChildren();
     order.forEach((key, idx) => {
+      const meta = featureCatalogState[key] || {};
       const row = document.createElement("div");
       row.className = "feature-order-row";
       row.dataset.feature = key;
       row.setAttribute("role", "listitem");
       row.draggable = true;
+
       const grip = document.createElement("span");
       grip.className = "feature-order-grip";
       grip.setAttribute("aria-hidden", "true");
       grip.textContent = "⋮⋮";
-      const label = document.createElement("span");
-      label.className = "feature-order-label";
-      label.textContent = FEATURE_LOCK_LABELS[key] || key;
-      row.append(grip, label);
+
+      const iconWrap = document.createElement("div");
+      iconWrap.className = "feature-order-icon-wrap";
+      const iconImg = document.createElement("img");
+      iconImg.className = "feature-order-icon";
+      iconImg.alt = "";
+      iconImg.width = 36;
+      iconImg.height = 36;
+      iconImg.src = resolveFeatureIconUrl(meta.icon || DEFAULT_FEATURE_ICONS[key]);
+      iconImg.onerror = () => {
+        iconImg.onerror = null;
+        iconImg.src = resolveFeatureIconUrl(DEFAULT_FEATURE_ICONS[key]);
+      };
+      iconWrap.appendChild(iconImg);
+
+      const nameCol = document.createElement("div");
+      nameCol.className = "feature-order-name";
+      const labelInput = document.createElement("input");
+      labelInput.type = "text";
+      labelInput.className = "feature-order-label-input";
+      labelInput.setAttribute("data-feature-label", key);
+      labelInput.maxLength = 40;
+      labelInput.value = meta.label || FEATURE_LOCK_LABELS[key] || key;
+      labelInput.addEventListener("mousedown", (ev) => ev.stopPropagation());
+      labelInput.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+      labelInput.addEventListener("click", (ev) => ev.stopPropagation());
+      labelInput.addEventListener("dragstart", (ev) => ev.preventDefault());
+      const iconActions = document.createElement("div");
+      iconActions.className = "feature-order-icon-actions";
+      const fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.accept = "image/png,image/jpeg,image/webp,image/gif";
+      fileInput.hidden = true;
+      const changeBtn = document.createElement("button");
+      changeBtn.type = "button";
+      changeBtn.className = "btn btn-ghost btn-sm";
+      changeBtn.textContent = "รูป";
+      changeBtn.title = "เปลี่ยนรูปฟังก์ชัน";
+      changeBtn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        fileInput.click();
+      });
+      const resetBtn = document.createElement("button");
+      resetBtn.type = "button";
+      resetBtn.className = "btn btn-ghost btn-sm";
+      resetBtn.textContent = "รีเซ็ต";
+      resetBtn.title = "คืนรูปเดิม";
+      resetBtn.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        setBtnLoading(resetBtn, true);
+        try {
+          const data = await api("/api/admin/feature-icon/" + encodeURIComponent(key), {
+            method: "DELETE",
+          });
+          featureCatalogState = normalizeFeatureCatalog(data.feature_catalog);
+          paintFeatureOrderList();
+          toast("คืนรูป " + (FEATURE_LOCK_LABELS[key] || key) + " แล้ว", "ok");
+        } catch (err) {
+          toast(err.message || String(err), "err");
+        } finally {
+          setBtnLoading(resetBtn, false);
+        }
+      });
+      fileInput.addEventListener("change", async () => {
+        const file = fileInput.files && fileInput.files[0];
+        fileInput.value = "";
+        if (!file) return;
+        setBtnLoading(changeBtn, true);
+        try {
+          const fd = new FormData();
+          fd.append("file", file, file.name || key + ".png");
+          const data = await apiUpload("/api/admin/feature-icon/" + encodeURIComponent(key), fd);
+          featureCatalogState = normalizeFeatureCatalog(data.feature_catalog);
+          paintFeatureOrderList();
+          toast("อัปเดตรูปแล้ว", "ok");
+        } catch (err) {
+          toast(err.message || String(err), "err");
+        } finally {
+          setBtnLoading(changeBtn, false);
+        }
+      });
+      iconActions.append(changeBtn, resetBtn, fileInput);
+      nameCol.append(labelInput, iconActions);
+
+      row.append(grip, iconWrap, nameCol);
       if (FEATURE_LOCK_KEY_SET.has(key)) {
         const tog = document.createElement("label");
         tog.className = "toggle-field";
@@ -2462,7 +2636,10 @@
     FEATURE_LOCK_KEYS.forEach((k) => {
       const opt = document.createElement("option");
       opt.value = k;
-      opt.textContent = FEATURE_LOCK_LABELS[k] || k;
+      opt.textContent =
+        (featureCatalogState[k] && featureCatalogState[k].label) ||
+        FEATURE_LOCK_LABELS[k] ||
+        k;
       sel.appendChild(opt);
     });
     const locks = settingsCache.feature_locks || {};
@@ -2646,6 +2823,7 @@
       settingsCache = normalizeSettings(data, settingsCache);
       paintSettingsControls(settingsCache);
       featureOrderState = normalizeFarmFeatureOrder(settingsCache.farm_feature_order);
+      featureCatalogState = normalizeFeatureCatalog(settingsCache.feature_catalog);
       paintFeatureOrderList();
       paintFeatureLockToggles(settingsCache.feature_locks);
       loadEarlyAccess().catch(() => {});
@@ -2660,6 +2838,7 @@
         settingsCache = recovered;
         paintSettingsControls(settingsCache);
         featureOrderState = normalizeFarmFeatureOrder(settingsCache.farm_feature_order);
+        featureCatalogState = normalizeFeatureCatalog(settingsCache.feature_catalog);
         paintFeatureOrderList();
         paintFeatureLockToggles(settingsCache.feature_locks);
         paintAfterplayProfiles(settingsCache);
@@ -4092,6 +4271,7 @@
       );
       paintSettingsControls(settingsCache);
       featureOrderState = normalizeFarmFeatureOrder(settingsCache.farm_feature_order);
+      featureCatalogState = normalizeFeatureCatalog(settingsCache.feature_catalog);
       paintFeatureOrderList();
       paintFeatureLockToggles(settingsCache.feature_locks);
       paintAfterplayProfiles(settingsCache);

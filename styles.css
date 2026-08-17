@@ -898,10 +898,10 @@ input:focus, .select-input:focus, .prompt-input:focus {
 }
 .feature-order-row {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto auto;
+  grid-template-columns: 18px 40px minmax(0, 1fr) auto auto;
   gap: 8px;
   align-items: center;
-  padding: 6px 8px;
+  padding: 8px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.03);
@@ -917,9 +917,49 @@ input:focus, .select-input:focus, .prompt-input:focus {
   letter-spacing: -0.12em;
   user-select: none;
 }
-.feature-order-label {
+.feature-order-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.feature-order-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.feature-order-name {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.feature-order-label,
+.feature-order-label-input {
   font-weight: 600;
   font-size: 0.92rem;
+}
+.feature-order-label-input {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  font-family: inherit;
+}
+.feature-order-icon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.feature-order-icon-actions .btn {
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
 }
 .feature-order-row .toggle-field {
   margin: 0;
