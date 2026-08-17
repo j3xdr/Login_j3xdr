@@ -2276,21 +2276,20 @@
     const pool = data.pool || {};
     const poolLine = $("proxy-pool-line");
     if (poolLine) {
-      if (pool.remaining_mb != null) {
+      if (pool.remaining_pct != null) {
         poolLine.textContent =
           "Pool: เหลือ " +
-          Number(pool.remaining_mb).toFixed(0) +
-          " MB" +
-          (pool.expiration_time ? " · หมดอายุ " + pool.expiration_time : "") +
-          (pool.detail ? " · " + pool.detail : "");
+          Number(pool.remaining_pct).toFixed(0) +
+          "%" +
+          (pool.expiration_time ? " · หมดอายุ " + pool.expiration_time : "");
       } else if (pool.usage_available && pool.used_pct != null) {
         poolLine.textContent =
           "Pool: ใช้ไป " +
           Number(pool.used_pct).toFixed(1) +
-          "% · " +
-          (pool.detail || "");
+          "%" +
+          (pool.detail ? " · " + pool.detail : "");
       } else {
-        poolLine.textContent = "Pool: " + (pool.detail || "ยังไม่มีสถิติ bandwidth");
+        poolLine.textContent = "Pool: " + (pool.detail || "ยังไม่มีสถิติ");
       }
     }
     const socksMasked = $("socks-current-masked");
@@ -2537,20 +2536,20 @@
       });
       const proxy = await loadAdminProxy().catch(() => null);
       const pool = data.pool || proxy?.pool || {};
-      if (pool.remaining_mb != null) {
+      if (pool.remaining_pct != null) {
         setStatus(
           $("proxy-status"),
-          "Token ใหม่ · เหลือ " + Number(pool.remaining_mb).toFixed(0) + " MB",
+          "Token ใหม่ · เหลือ " + Number(pool.remaining_pct).toFixed(0) + "%",
           "ok"
         );
-        toast("เปลี่ยน Thordata API แล้ว", "ok");
+        toast("เปลี่ยน API แล้ว", "ok");
       } else if (pool.usage_available && pool.used_pct != null) {
         setStatus(
           $("proxy-status"),
           "Token ใหม่ · Pool ใช้ไป " + Number(pool.used_pct).toFixed(1) + "%",
           "ok"
         );
-        toast("เปลี่ยน Thordata API แล้ว", "ok");
+        toast("เปลี่ยน API แล้ว", "ok");
       } else {
         setStatus(
           $("proxy-status"),
