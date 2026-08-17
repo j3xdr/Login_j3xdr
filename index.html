@@ -534,25 +534,68 @@
                 <h3>Proxy ร้าน</h3>
                 <span id="proxy-status-badge" class="proxy-badge is-unknown" role="status">กำลังตรวจ…</span>
               </div>
-              <p class="muted settings-hint">Webshare rotating — กด Apply เพื่อบันทึกและทดสอบจากเซิร์ฟเวอร์</p>
+              <p class="muted settings-hint">Thordata residential HTTP — ใช้กับทุกฟีเจอร์ร้าน · SOCKS5 ใช้แค่ล็อกอินคลังส่งหัวใจ</p>
               <p class="muted" id="proxy-current-masked" style="margin:0 0 8px;word-break:break-all;">ปัจจุบัน: —</p>
               <label class="field" for="admin-proxy-url">
-                <span>PROXY URL</span>
+                <span>HTTP PROXY URL (Thordata)</span>
                 <input id="admin-proxy-url" type="password" autocomplete="off" spellcheck="false" placeholder="http://user:pass@host:port" />
               </label>
+              <label class="field" for="admin-heart-socks-url">
+                <span>SOCKS5 URL (ล็อกอินคลังส่ง)</span>
+                <input id="admin-heart-socks-url" type="password" autocomplete="off" spellcheck="false" placeholder="socks5://user:pass@host:port" />
+              </label>
+              <p class="muted" id="socks-current-masked" style="margin:0 0 8px;word-break:break-all;">SOCKS ปัจจุบัน: —</p>
               <label class="field" for="admin-webshare-token">
-                <span>WEBSHARE API TOKEN</span>
-                <input id="admin-webshare-token" type="password" autocomplete="off" spellcheck="false" placeholder="Token จาก Webshare → API Keys" />
+                <span>THORDATA API TOKEN</span>
+                <input id="admin-webshare-token" type="password" autocomplete="off" spellcheck="false" placeholder="Token จาก Thordata → My Account" />
               </label>
               <p class="muted settings-hint" id="webshare-token-masked" style="margin:0 0 8px;">Token ปัจจุบัน: —</p>
               <div class="settings-row settings-actions" style="margin-top:10px;">
-                <button type="button" class="btn btn-primary btn-sm" id="proxy-apply-btn">Apply Proxy</button>
+                <button type="button" class="btn btn-primary btn-sm" id="proxy-apply-btn">Apply HTTP</button>
+                <button type="button" class="btn btn-primary btn-sm" id="heart-socks-apply-btn">Apply SOCKS</button>
                 <button type="button" class="btn btn-primary btn-sm" id="webshare-token-apply-btn">Apply Token</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="proxy-check-btn">ตรวจสถานะ</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="proxy-show-btn" title="แสดง/ซ่อน URL">แสดง</button>
               </div>
               <p id="proxy-pool-line" class="muted settings-hint" style="margin-top:8px;">Pool: —</p>
               <p id="proxy-status" class="status muted" role="status"></p>
+            </div>
+            <div class="panel">
+              <div class="panel-head-row">
+                <h3>คลังส่งหัวใจ</h3>
+                <button type="button" class="btn btn-ghost btn-sm" id="heart-helpers-refresh-btn">รีเฟรช</button>
+              </div>
+              <p class="muted settings-hint">Add/Merge อีเมล&lt;แท็บ&gt;รหัส · หลายบรรทัดหรือไฟล์ .txt · สถานะมาจากการถูกใช้จริง ไม่ล็อกอินทั้งกองตอนเปิดหน้า</p>
+              <p id="heart-helpers-stats" class="muted settings-hint" style="margin:0 0 8px;">ทั้งหมด: — · Login แล้ว: — · ผ่าน: — · ไม่ผ่าน 3 รอบ: —</p>
+              <label class="field" for="heart-helpers-file">
+                <span>ไฟล์ .txt</span>
+                <input id="heart-helpers-file" type="file" accept=".txt,text/plain" />
+              </label>
+              <label class="field" for="heart-helpers-text">
+                <span>วาง mail[TAB]pass (หลายบรรทัด)</span>
+                <textarea id="heart-helpers-text" rows="8" spellcheck="false" placeholder="mail@example.com&#9;password"></textarea>
+              </label>
+              <div class="settings-row settings-actions" style="margin-top:10px;">
+                <button type="button" class="btn btn-primary btn-sm" id="heart-helpers-merge-btn">Add / Merge</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="heart-helpers-download-btn">Download .txt</button>
+              </div>
+              <p id="heart-helpers-status" class="status muted" role="status"></p>
+              <div class="table-wrap" style="margin-top:10px;max-height:360px;overflow:auto;">
+                <table class="data-table" id="heart-helpers-table">
+                  <thead>
+                    <tr>
+                      <th>อีเมล</th>
+                      <th>รหัส</th>
+                      <th>Token</th>
+                      <th>พัง</th>
+                      <th>ล่าสุด</th>
+                    </tr>
+                  </thead>
+                  <tbody id="heart-helpers-tbody">
+                    <tr><td colspan="5" class="muted">—</td></tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
             <div class="panel mode-web-or-invite">
               <div class="panel-head-row">
@@ -648,6 +691,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260815-ul2"></script>
+  <script src="./app.js?v=20260817-heartloop"></script>
 </body>
 </html>

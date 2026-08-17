@@ -33,6 +33,7 @@
   let sessionToken = null;
   let adminId = null;
   let apiReady = false;
+  let heartHelpersTimer = null;
   let modalMode = null;
   let modalResolver = null;
   let adminMode = (() => {
@@ -60,10 +61,6 @@
     "giftdraw",
     "upgrade",
     "cookie",
-    "reroll",
-    "quest",
-    "account",
-    "dstool",
     "afterplay_fast",
     "unlock_l",
     "ice_tower",
@@ -75,10 +72,6 @@
     giftdraw: "เปิดกล่อง",
     upgrade: "ตีบวก",
     cookie: "Cookie",
-    reroll: "รีโรล",
-    quest: "เควส",
-    account: "ข้อมูลไอดี",
-    dstool: "ทดสอบเกม",
     afterplay_fast: "ฟาร์มเงิน/XP",
     unlock_l: "ปลดล็อค L",
     ice_tower: "Ice Tower",
@@ -90,13 +83,9 @@
     "giftdraw",
     "upgrade",
     "cookie",
-    "reroll",
-    "quest",
     "afterplay_fast",
     "unlock_l",
     "ice_tower",
-    "account",
-    "dstool",
   ];
   const FEATURE_LOCK_KEY_SET = new Set(FEATURE_LOCK_KEYS);
   let featureOrderState = DEFAULT_FARM_FEATURE_ORDER.slice();
@@ -2264,6 +2253,7 @@
       paintAfterplayProfiles(data);
       paintOverviewAlerts();
       loadAdminProxy().catch(() => {});
+      loadHeartHelpers().catch(() => {});
       loadInvitePoolStats().catch(() => {});
     } catch (_) {}
   }
@@ -2286,7 +2276,14 @@
     const pool = data.pool || {};
     const poolLine = $("proxy-pool-line");
     if (poolLine) {
-      if (pool.usage_available && pool.used_pct != null) {
+      if (pool.remaining_mb != null) {
+        poolLine.textContent =
+          "Pool: เหลือ " +
+          Number(pool.remaining_mb).toFixed(0) +
+          " MB" +
+          (pool.expiration_time ? " · หมดอายุ " + pool.expiration_time : "") +
+          (pool.detail ? " · " + pool.detail : "");
+      } else if (pool.usage_available && pool.used_pct != null) {
         poolLine.textContent =
           "Pool: ใช้ไป " +
           Number(pool.used_pct).toFixed(1) +
@@ -2296,11 +2293,19 @@
         poolLine.textContent = "Pool: " + (pool.detail || "ยังไม่มีสถิติ bandwidth");
       }
     }
+    const socksMasked = $("socks-current-masked");
+    if (socksMasked) {
+      const src = data.socks_source ? " · " + data.socks_source : "";
+      socksMasked.textContent =
+        "SOCKS ปัจจุบัน: " + (data.socks_url_masked || "ยังไม่ตั้ง") + src;
+    }
     const tokenLine = $("webshare-token-masked");
     if (tokenLine) {
-      tokenLine.textContent = data.webshare_token_configured
-        ? "Token ปัจจุบัน: " + (data.webshare_token_masked || "ตั้งแล้ว")
-        : "Token ปัจจุบัน: ยังไม่ตั้ง — % Pool จะอ่านจากบัญชีเก่า";
+      const configured = data.thordata_token_configured || data.webshare_token_configured;
+      const masked = data.thordata_token_masked || data.webshare_token_masked;
+      tokenLine.textContent = configured
+        ? "Token ปัจจุบัน: " + (masked || "ตั้งแล้ว")
+        : "Token ปัจจุบัน: ยังไม่ตั้ง — Pool จะไม่มีตัวเลขเน็ตเหลือ";
     }
     const check = data.check;
     if (data.ready || (check && check.ok)) {
@@ -2520,11 +2525,11 @@
     const input = $("admin-webshare-token");
     const token = String(input?.value || "").trim();
     if (token.length < 8) {
-      setStatus($("proxy-status"), "ใส่ Webshare API Token ก่อน", "err");
+      setStatus($("proxy-status"), "ใส่ Thordata API Token ก่อน", "err");
       return;
     }
     setBtnLoading($("webshare-token-apply-btn"), true);
-    setStatus($("proxy-status"), "บันทึก Webshare API Token…", "muted");
+    setStatus($("proxy-status"), "บันทึก Thordata API Token…", "muted");
     try {
       const data = await api("/api/admin/webshare-token", {
         method: "POST",
@@ -2532,13 +2537,20 @@
       });
       const proxy = await loadAdminProxy().catch(() => null);
       const pool = data.pool || proxy?.pool || {};
-      if (pool.usage_available && pool.used_pct != null) {
+      if (pool.remaining_mb != null) {
+        setStatus(
+          $("proxy-status"),
+          "Token ใหม่ · เหลือ " + Number(pool.remaining_mb).toFixed(0) + " MB",
+          "ok"
+        );
+        toast("เปลี่ยน Thordata API แล้ว", "ok");
+      } else if (pool.usage_available && pool.used_pct != null) {
         setStatus(
           $("proxy-status"),
           "Token ใหม่ · Pool ใช้ไป " + Number(pool.used_pct).toFixed(1) + "%",
           "ok"
         );
-        toast("เปลี่ยน Webshare API แล้ว", "ok");
+        toast("เปลี่ยน Thordata API แล้ว", "ok");
       } else {
         setStatus(
           $("proxy-status"),
@@ -2554,6 +2566,151 @@
       toast("บันทึก Token ไม่สำเร็จ", "err");
     } finally {
       setBtnLoading($("webshare-token-apply-btn"), false);
+    }
+  }
+
+  async function applyHeartSocks() {
+    const input = $("admin-heart-socks-url");
+    const url = String(input?.value || "").trim();
+    if (!/^socks5h?:\/\//i.test(url)) {
+      setStatus($("proxy-status"), "รูปแบบไม่ถูกต้อง — ต้องขึ้นต้นด้วย socks5://", "err");
+      return;
+    }
+    setBtnLoading($("heart-socks-apply-btn"), true);
+    setStatus($("proxy-status"), "บันทึก SOCKS5…", "muted");
+    try {
+      const data = await api("/api/admin/heart-socks", {
+        method: "POST",
+        body: { socks_url: url },
+      });
+      paintAdminProxy(data);
+      toast("บันทึก SOCKS5 แล้ว", "ok");
+      if (input) input.value = "";
+      await loadAudit().catch(() => {});
+    } catch (err) {
+      setStatus($("proxy-status"), err.message || String(err), "err");
+      toast("บันทึก SOCKS ไม่สำเร็จ", "err");
+    } finally {
+      setBtnLoading($("heart-socks-apply-btn"), false);
+    }
+  }
+
+  function paintHeartHelpers(data) {
+    const st = data?.stats || data || {};
+    const items = data?.items || [];
+    const line = $("heart-helpers-stats");
+    if (line) {
+      line.textContent =
+        "ทั้งหมด: " +
+        (st.total ?? "—") +
+        " / Login แล้ว: " +
+        (st.logged_in ?? "—") +
+        " / ผ่าน: " +
+        (st.passed ?? "—") +
+        " / ไม่ผ่าน 3 รอบ: " +
+        (st.fail_3 ?? "—") +
+        (items.length ? " · แสดง " + items.length + " รายการ" : "");
+    }
+    const tbody = $("heart-helpers-tbody");
+    if (!tbody) return;
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="muted">ยังไม่มีไอดีในคลัง</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items
+      .map((row) => {
+        const token = row.has_token ? "มี" : "—";
+        const fails = row.fail_customers ? String(row.fail_customers) + "/3" : "0";
+        const last = row.last_ok_at || row.last_login_ok_at || row.last_fail_at || "—";
+        return (
+          "<tr><td>" +
+          escapeHtml(row.email || "") +
+          "</td><td>" +
+          escapeHtml(row.password || "") +
+          "</td><td>" +
+          escapeHtml(token) +
+          "</td><td>" +
+          escapeHtml(fails) +
+          "</td><td class=\"muted\">" +
+          escapeHtml(String(last)) +
+          (row.last_error ? "<br>" + escapeHtml(String(row.last_error).slice(0, 80)) : "") +
+          "</td></tr>"
+        );
+      })
+      .join("");
+  }
+
+  async function loadHeartHelpers() {
+    try {
+      const data = await api("/api/admin/heart-helpers?limit=100");
+      paintHeartHelpers(data);
+      if (!heartHelpersTimer) {
+        heartHelpersTimer = setInterval(() => {
+          loadHeartHelpers().catch(() => {});
+        }, 20000);
+      }
+    } catch (err) {
+      setStatus($("heart-helpers-status"), err.message || String(err), "err");
+    }
+  }
+
+  async function mergeHeartHelpers() {
+    const status = $("heart-helpers-status");
+    const text = String($("heart-helpers-text")?.value || "");
+    if (!text.trim()) {
+      setStatus(status, "วางรายชื่อหรือเลือกไฟล์ .txt ก่อน", "err");
+      return;
+    }
+    setBtnLoading($("heart-helpers-merge-btn"), true);
+    setStatus(status, "กำลัง Merge…", "muted");
+    try {
+      const data = await api("/api/admin/heart-helpers/merge", {
+        method: "POST",
+        body: { text },
+      });
+      setStatus(
+        status,
+        "เพิ่ม " +
+          (data.added || 0) +
+          " · อัปเดต " +
+          (data.updated || 0) +
+          " · ข้าม " +
+          (data.skipped || 0) +
+          " · รวม " +
+          (data.total || 0),
+        "ok"
+      );
+      toast("Merge คลังส่งแล้ว", "ok");
+      if ($("heart-helpers-text")) $("heart-helpers-text").value = "";
+      if ($("heart-helpers-file")) $("heart-helpers-file").value = "";
+      await loadHeartHelpers();
+      await loadAudit().catch(() => {});
+    } catch (err) {
+      setStatus(status, err.message || String(err), "err");
+    } finally {
+      setBtnLoading($("heart-helpers-merge-btn"), false);
+    }
+  }
+
+  async function downloadHeartHelpers() {
+    try {
+      const headers = {};
+      if (accessToken) headers.Authorization = "Bearer " + accessToken;
+      if (sessionToken) headers["X-Session-Token"] = sessionToken;
+      const res = await fetch(API + "/api/admin/heart-helpers/download", { headers });
+      if (!res.ok) throw new Error("download_failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "heart_helpers.txt";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast("ดาวน์โหลดคลังส่งแล้ว", "ok");
+    } catch (err) {
+      setStatus($("heart-helpers-status"), err.message || String(err), "err");
     }
   }
 
@@ -3532,16 +3689,32 @@
   });
 
   $("proxy-apply-btn")?.addEventListener("click", () => applyAdminProxy());
+  $("heart-socks-apply-btn")?.addEventListener("click", () => applyHeartSocks());
   $("webshare-token-apply-btn")?.addEventListener("click", () => applyWebshareToken());
   $("proxy-check-btn")?.addEventListener("click", () => checkAdminProxy());
+  $("heart-helpers-refresh-btn")?.addEventListener("click", () => loadHeartHelpers());
+  $("heart-helpers-merge-btn")?.addEventListener("click", () => mergeHeartHelpers());
+  $("heart-helpers-download-btn")?.addEventListener("click", () => downloadHeartHelpers());
+  $("heart-helpers-file")?.addEventListener("change", async (ev) => {
+    const file = ev.target?.files?.[0];
+    if (!file || !$("heart-helpers-text")) return;
+    try {
+      $("heart-helpers-text").value = await file.text();
+      setStatus($("heart-helpers-status"), "โหลดไฟล์แล้ว — กด Add/Merge เพื่อบันทึก", "muted");
+    } catch (err) {
+      setStatus($("heart-helpers-status"), err.message || String(err), "err");
+    }
+  });
   $("proxy-show-btn")?.addEventListener("click", () => {
     const input = $("admin-proxy-url");
     const tokenInput = $("admin-webshare-token");
+    const socksInput = $("admin-heart-socks-url");
     const btn = $("proxy-show-btn");
-    if (!input && !tokenInput) return;
-    const show = (input || tokenInput).type === "password";
+    if (!input && !tokenInput && !socksInput) return;
+    const show = (input || tokenInput || socksInput).type === "password";
     if (input) input.type = show ? "text" : "password";
     if (tokenInput) tokenInput.type = show ? "text" : "password";
+    if (socksInput) socksInput.type = show ? "text" : "password";
     if (btn) btn.textContent = show ? "ซ่อน" : "แสดง";
   });
 
