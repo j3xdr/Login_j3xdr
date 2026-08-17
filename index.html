@@ -3,25 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>CKR Admin Console</title>
+  <title>CKR Admin · Control Room</title>
   <meta name="description" content="CKR WWDC Admin — เช่าวัน PC / Powder / Web" />
-  <meta name="color-scheme" content="dark" />
-  <meta name="theme-color" content="#000000" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#0f141b" />
   <link rel="icon" href="assets/logo_4k.png" type="image/png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260815-ice1" />
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css?v=20260817-neutral-dark2" />
+  <link rel="stylesheet" href="./redesign.css?v=20260817-neutral-dark2" />
 </head>
-<body>
+<body class="theme-dark">
   <!-- LOGIN -->
   <section id="login-panel" class="view login-view">
+    <div class="login-grid-mark" aria-hidden="true">
+      <span></span><span></span><span></span><span></span>
+    </div>
     <div class="login-card">
       <div class="login-brand">
         <img src="assets/logo_4k.png" width="44" height="44" alt="" />
         <div>
+          <span class="login-kicker">CKR / CONTROL ROOM</span>
           <h1>CKR Admin</h1>
-          <p>จัดการเช่าวัน PC, Powder &amp; Web</p>
+          <p>จัดการสิทธิ์และการทำงานของระบบจากที่เดียว</p>
         </div>
       </div>
       <form id="login-form" autocomplete="on">
@@ -33,9 +38,17 @@
           <span>รหัสผ่าน</span>
           <input id="login-pass" name="password" type="password" required autocomplete="current-password" />
         </label>
+        <label class="remember-row">
+          <input id="remember-me" name="remember_me" type="checkbox" />
+          <span class="remember-copy">
+            <strong>จดจำการเข้าสู่ระบบ</strong>
+            <small>ใช้ได้เฉพาะบนอุปกรณ์นี้ และไม่บันทึกรหัสผ่าน</small>
+          </span>
+        </label>
         <button class="btn btn-primary btn-block" type="submit" id="login-btn">เข้าสู่ระบบ</button>
         <p id="login-status" class="status muted" role="status"></p>
       </form>
+      <div class="login-meta"><span>SECURE SESSION</span><span aria-hidden="true">·</span><span>ADMIN ONLY</span></div>
     </div>
   </section>
 
@@ -50,11 +63,11 @@
         </div>
       </div>
       <nav class="sidebar-nav pos-bottom-nav" aria-label="แท็บหลัก">
-        <button type="button" class="nav-item is-active" data-view="overview" title="ภาพรวม">
+        <button type="button" class="nav-item is-active" data-view="overview" title="หน้าหลัก">
           <span class="nav-icon" aria-hidden="true">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
           </span>
-          <span class="nav-label">ภาพรวม</span>
+          <span class="nav-label">หน้าหลัก</span>
         </button>
         <button type="button" class="nav-item" data-view="users" title="ผู้ใช้">
           <span class="nav-icon" aria-hidden="true">
@@ -62,17 +75,17 @@
           </span>
           <span class="nav-label">ผู้ใช้</span>
         </button>
-        <button type="button" class="nav-item" data-view="cashier" title="แคชเชียร์">
+        <button type="button" class="nav-item" data-view="cashier" title="งานด่วน">
           <span class="nav-icon" aria-hidden="true">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
           </span>
-          <span class="nav-label">แคชเชียร์</span>
+          <span class="nav-label">งานด่วน</span>
         </button>
-        <button type="button" class="nav-item" data-view="system" title="ระบบ">
+        <button type="button" class="nav-item" data-view="system" title="ตั้งค่า">
           <span class="nav-icon" aria-hidden="true">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </span>
-          <span class="nav-label">ระบบ</span>
+          <span class="nav-label">ตั้งค่า</span>
         </button>
       </nav>
       <div class="sidebar-foot">
@@ -89,6 +102,25 @@
           <span id="who-user-mobile" class="mobile-who">—</span>
           <button type="button" id="logout-btn-mobile" class="btn btn-ghost btn-sm">ออก</button>
         </div>
+        <div class="topbar-taskbar" aria-label="งานด่วน">
+          <span class="topbar-task-label">งานด่วน</span>
+          <button type="button" class="topbar-task-btn" data-shortcut="extend-user">
+            <svg class="topbar-task-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            <span>ต่ออายุ</span>
+          </button>
+          <button type="button" class="topbar-task-btn" data-shortcut="credit-user">
+            <svg class="topbar-task-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 14 9l6 3-6 3-2 6-2-6-6-3 6-3 2-6Z"/></svg>
+            <span>เติมเครดิต</span>
+          </button>
+          <button type="button" class="topbar-task-btn" data-shortcut="create-user">
+            <svg class="topbar-task-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M18 8v6M15 11h6"/></svg>
+            <span>สร้างบัญชี</span>
+          </button>
+          <button type="button" class="topbar-task-btn" data-shortcut="search-user">
+            <svg class="topbar-task-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.5 4.5"/></svg>
+            <span>ค้นหาผู้ใช้</span>
+          </button>
+        </div>
         <div class="mode-switch" role="group" aria-label="โหมด">
           <button type="button" class="mode-btn is-active" data-mode="day" id="mode-day">PC</button>
           <button type="button" class="mode-btn" data-mode="powder" id="mode-powder">Powder</button>
@@ -97,32 +129,57 @@
         </div>
         <div class="topbar-right">
           <button type="button" id="cmd-open-btn" class="btn btn-ghost btn-sm cmd-hint-btn" title="ค้นหาด่วน (⌘K)">
+            <svg class="button-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.5 4.5"/></svg>
             <span class="cmd-hint-label">ค้นหา</span>
             <kbd>⌘K</kbd>
+          </button>
+          <button type="button" id="theme-btn" class="btn btn-ghost btn-sm" aria-pressed="true" title="เปลี่ยนเป็น Light mode">
+            <svg class="button-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/></svg>
+            <span>โหมดสว่าง</span>
           </button>
           <div id="api-status" class="api-chip is-waking" aria-live="polite">API…</div>
         </div>
       </header>
 
       <main class="pos-content">
+        <div id="preview-banner" class="preview-banner hidden" role="status">
+          <span class="preview-dot" aria-hidden="true"></span>
+          <span><strong>LOCAL PREVIEW</strong> ข้อมูลทั้งหมดเป็น mock และการกระทำจริงถูกปิดไว้</span>
+          <button type="button" class="btn btn-ghost btn-sm" id="preview-exit-btn">กลับหน้า Login</button>
+        </div>
 
         <!-- OVERVIEW -->
         <section id="view-overview" class="pos-view is-active" data-panel="overview">
           <div class="view-head">
             <div>
-              <h2>ภาพรวม</h2>
+              <h2><span class="view-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>ภาพรวม</h2>
               <p class="muted" id="overview-mode-hint">โหมด PC · ฟิลด์ expires_at</p>
             </div>
-            <button type="button" class="btn btn-ghost btn-sm" id="refresh-overview-btn">รีเฟรช</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="refresh-overview-btn">
+              <svg class="button-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0 1 4"/><path d="M20 4v7h-7"/></svg>
+              <span>รีเฟรช</span>
+            </button>
           </div>
 
           <div id="overview-alerts" class="alert-list" aria-live="polite"></div>
 
           <div class="shortcut-row">
-            <button type="button" class="shortcut-btn" data-shortcut="search-user">ค้นหาผู้ใช้</button>
-            <button type="button" class="shortcut-btn" data-shortcut="create-user">สร้างบัญชี</button>
-            <button type="button" class="shortcut-btn" data-shortcut="extend-user">ต่ออายุ</button>
-            <button type="button" class="shortcut-btn mode-web-only" data-shortcut="stuck-topups">เติมค้าง</button>
+            <button type="button" class="shortcut-btn shortcut-primary" data-shortcut="search-user">
+              <span class="shortcut-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.5 4.5"/></svg></span>
+              <span><strong>ค้นหาผู้ใช้</strong><small>เปิดประวัติและทำรายการต่อ</small></span>
+            </button>
+            <button type="button" class="shortcut-btn" data-shortcut="extend-user">
+              <span class="shortcut-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+              <span><strong>เติมวัน / ต่ออายุ</strong><small>เลือกแพ็กหรือกำหนดวันเอง</small></span>
+            </button>
+            <button type="button" class="shortcut-btn" data-shortcut="credit-user">
+              <span class="shortcut-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 14 9l6 3-6 3-2 6-2-6-6-3 6-3 2-6Z"/></svg></span>
+              <span><strong>เติมเครดิต</strong><small>เพิ่ม/ลด Invite Credit พร้อมเหตุผล</small></span>
+            </button>
+            <button type="button" class="shortcut-btn mode-web-only" data-shortcut="stuck-topups">
+              <span class="shortcut-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v4M12 16h.01"/></svg></span>
+              <span><strong>จัดการเติมค้าง</strong><small>ตรวจรายการที่ต้องทำต่อ</small></span>
+            </button>
           </div>
 
           <div class="kpi-grid">
@@ -136,11 +193,11 @@
 
           <div class="overview-split">
             <div class="panel">
-              <div class="panel-head-row"><h3>สถิติวันนี้</h3></div>
+            <div class="panel-head-row"><h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16"/><path d="m7 15 3-4 3 2 5-6"/></svg></span>สถิติวันนี้</h3></div>
               <div id="daily-stats-cards" class="mini-stat-grid muted">กำลังโหลด…</div>
             </div>
             <div class="panel">
-              <div class="panel-head-row"><h3>กิจกรรมล่าสุด</h3></div>
+            <div class="panel-head-row"><h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h3l2-5 4 10 2-5h5"/></svg></span>กิจกรรมล่าสุด</h3></div>
               <div id="recent-activity" class="activity-list muted">กำลังโหลด…</div>
             </div>
           </div>
@@ -150,12 +207,12 @@
         <section id="view-users" class="pos-view" data-panel="users">
           <div class="view-head">
             <div>
-              <h2>ผู้ใช้</h2>
+              <h2><span class="view-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 4.5a4 4 0 0 1 0 7.5M18 15a4 4 0 0 1 3 4v2"/></svg></span>ผู้ใช้</h2>
               <p class="muted" id="users-count-label">—</p>
             </div>
             <div class="view-head-actions">
-              <button type="button" class="btn btn-ghost btn-sm" id="export-csv-btn">Export CSV</button>
-              <button type="button" class="btn btn-ghost btn-sm" id="refresh-btn">รีเฟรช</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="export-csv-btn"><svg class="button-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg><span>Export CSV</span></button>
+              <button type="button" class="btn btn-ghost btn-sm" id="refresh-btn"><svg class="button-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0 1 4"/><path d="M20 4v7h-7"/></svg><span>รีเฟรช</span></button>
             </div>
           </div>
 
@@ -209,9 +266,17 @@
         <section id="view-cashier" class="pos-view" data-panel="cashier">
           <div class="view-head">
             <div>
-              <h2>แคชเชียร์</h2>
+              <h2><span class="view-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg></span>งานด่วน</h2>
               <p class="muted" id="cashier-mode-hint">เปิดสิทธิ์วันใช้งาน (PC)</p>
             </div>
+          </div>
+
+          <div class="cashier-flow" aria-label="ลำดับการทำงาน">
+            <span class="cashier-flow-step is-active"><b>1</b> เลือกงาน</span>
+            <span class="cashier-flow-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span>
+            <span class="cashier-flow-step"><b>2</b> ค้นหาผู้ใช้</span>
+            <span class="cashier-flow-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span>
+            <span class="cashier-flow-step"><b>3</b> ตรวจสอบแล้วบันทึก</span>
           </div>
 
           <div class="cashier-grid">
@@ -349,7 +414,7 @@
             </div>
 
             <aside class="panel receipt-panel" aria-live="polite">
-              <h3>ใบเสร็จล่าสุด</h3>
+              <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg></span>ใบเสร็จล่าสุด</h3>
               <div id="receipt-box" class="receipt-box muted">ยังไม่มีรายการในรอบนี้</div>
             </aside>
           </div>
@@ -357,10 +422,15 @@
 
         <!-- SYSTEM -->
         <section id="view-system" class="pos-view" data-panel="system">
-          <div class="view-head"><h2>ระบบ</h2></div>
+          <div class="view-head">
+            <div>
+              <h2><span class="view-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5v.2h-4v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1-2.8-2.8.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3v-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1 2.8-2.8.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5V3h4v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1 2.8 2.8-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1h.2v4h-.2a1.7 1.7 0 0 0-1.5 1Z"/></svg></span>ตั้งค่าระบบ</h2>
+              <p class="muted">จัดการค่ากลางของฟาร์มและระบบขาย · ค่าที่บันทึกล่าสุดจะถูกใช้ต่อเนื่อง</p>
+            </div>
+          </div>
           <div class="system-grid">
             <div class="panel">
-              <h3>ปิดปรับปรุง</h3>
+              <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v4M12 16h.01"/></svg></span>ปิดปรับปรุง</h3>
               <div class="settings-row">
                 <label class="toggle-field"><input type="checkbox" id="set-farm-maint" /><span>ปิดฟาร์มทั้งหมด</span></label>
                 <label class="toggle-field"><input type="checkbox" id="set-topup-maint" /><span>ปิดเติมเงิน</span></label>
@@ -434,11 +504,12 @@
               <p class="muted settings-hint">เพดานรอบ: 0 = ไม่จำกัด จนกว่าจะถึงเป้าที่ลูกค้าใส่หรือระบบคำนวณ</p>
               <div class="settings-row settings-actions">
                 <button type="button" class="btn btn-primary btn-sm" id="save-settings-btn">บันทึก</button>
+                <span id="settings-saved-at" class="settings-save-note muted">ค่าจะยึดตามการบันทึกล่าสุด</span>
               </div>
               <p id="settings-status" class="status muted" role="status"></p>
             </div>
             <div class="panel" id="afterplay-profile-panel">
-              <h3>โปรไฟล์ ฟาร์มเงิน/XP</h3>
+              <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 14 9l6 3-6 3-2 6-2-6-6-3 6-3 2-6Z"/></svg></span>โปรไฟล์ ฟาร์มเงิน/XP</h3>
               <p class="muted settings-hint">ค่าจังหวะ/กล่อง/เหรียญของงานถัดไป · ลูกค้าเว็บไม่เห็นช่องเหล่านี้</p>
               <div class="tab-bar ap-profile-tabs" role="tablist">
                 <button type="button" class="tab-btn is-active" id="ap-profile-tab-money_xp" data-ap-profile-tab="money_xp" role="tab" aria-selected="true">เงิน/XP</button>
@@ -513,7 +584,7 @@
               <p id="ap-profile-status" class="status muted" role="status"></p>
             </div>
             <div class="panel">
-              <h3>เข้าถึงก่อนใคร</h3>
+              <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></span>เข้าถึงก่อนใคร</h3>
               <p class="muted settings-hint">เลือกฟีเจอร์ที่ปิดอยู่ แล้วใส่ username ที่ให้เห็นและใช้ได้ · สิทธิ์ถาวรจนกว่าจะลบชื่อ · ไม่แทนวันเช่าและไม่ให้ Credit ฟรี</p>
               <label class="field">
                 <span>ฟีเจอร์</span>
@@ -531,7 +602,7 @@
             </div>
             <div class="panel">
               <div class="panel-head-row">
-                <h3>Proxy ร้าน</h3>
+              <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>Proxy ร้าน</h3>
                 <span id="proxy-status-badge" class="proxy-badge is-unknown" role="status">กำลังตรวจ…</span>
               </div>
               <p class="muted settings-hint">Thordata residential HTTP — ใช้กับทุกฟีเจอร์ร้าน · SOCKS5 ใช้แค่ล็อกอินคลังส่งหัวใจ</p>
@@ -562,7 +633,7 @@
             </div>
             <div class="panel">
               <div class="panel-head-row">
-                <h3>คลังส่งหัวใจ</h3>
+              <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 8.7c0 5.2-8.8 10.3-8.8 10.3S3.2 13.9 3.2 8.7A4.7 4.7 0 0 1 12 6a4.7 4.7 0 0 1 8.8 2.7Z"/></svg></span>คลังส่งหัวใจ</h3>
                 <button type="button" class="btn btn-ghost btn-sm" id="heart-helpers-refresh-btn">รีเฟรช</button>
               </div>
               <p class="muted settings-hint">Add/Merge อีเมล&lt;แท็บ&gt;รหัส · หลายบรรทัดหรือไฟล์ .txt · สถานะมาจากการถูกใช้จริง ไม่ล็อกอินทั้งกองตอนเปิดหน้า</p>
@@ -599,7 +670,7 @@
             </div>
             <div class="panel mode-web-or-invite">
               <div class="panel-head-row">
-                <h3>Invite Guest Pool</h3>
+              <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M18 8v6M15 11h6"/></svg></span>Invite Guest Pool</h3>
                 <button type="button" class="btn btn-ghost btn-sm" id="invite-pool-refresh-btn">รีเฟรช</button>
               </div>
               <p class="muted settings-hint">อัปโหลด/วาง JSON จาก guest_pool.json — merge รวมเข้า Pool (dedupe ตาม mid)</p>
@@ -621,14 +692,14 @@
             </div>
             <div class="panel mode-web-only">
               <div class="panel-head-row">
-                <h3>เติมค้าง / ตามมือ</h3>
+              <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>เติมค้าง / ตามมือ</h3>
                 <button type="button" class="btn btn-ghost btn-sm" id="refresh-stuck-btn">รีเฟรช</button>
               </div>
               <div id="stuck-topups" class="admin-list muted">กำลังโหลด…</div>
             </div>
             <div class="panel panel-wide">
               <div class="panel-head-row">
-                <h3>บันทึกการกระทำ</h3>
+              <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3.5h6M8 9h8M8 13h8M8 17h5"/></svg></span>บันทึกการกระทำ</h3>
                 <button type="button" class="btn btn-ghost btn-sm" id="refresh-audit-btn">รีเฟรช</button>
               </div>
               <div class="audit-toolbar">
@@ -691,6 +762,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260817-heartui"></script>
+  <script src="./app.js?v=20260817-neutral-dark1"></script>
 </body>
 </html>

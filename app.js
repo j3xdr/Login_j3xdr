@@ -11,12 +11,216 @@
 
   const API = cfg.API_BASE || "";
   const SESSION_KEY = "ckr_admin_session_token";
+  const REMEMBER_ME_KEY = "ckr_admin_remember_me";
   const MODE_KEY = "ckr_admin_mode";
   const DENSITY_KEY = "ckr_admin_density";
+  const THEME_KEY = "ckr_admin_theme";
   const EDGE_ADMIN_FN = "admin-register";
   const USERS_PAGE = 100;
+  const PREVIEW_MODE = (() => {
+    try {
+      const host = location.hostname;
+      return (
+        (host === "localhost" || host === "127.0.0.1") &&
+        new URLSearchParams(location.search).get("preview") === "1"
+      );
+    } catch (_) {
+      return false;
+    }
+  })();
+  const PREVIEW_PROFILE = {
+    id: "preview-admin",
+    username: "preview-admin",
+    display_name: "Preview Admin",
+    role: "admin",
+  };
+  const PREVIEW_USERS = [
+    {
+      id: "preview-01",
+      username: "alpha.demo",
+      display_name: "Alpha Demo",
+      role: "normal",
+      is_permanent: false,
+      expires_at: new Date(Date.now() + 1000 * 60 * 60 * 26).toISOString(),
+      powder_is_permanent: false,
+      powder_expires_at: new Date(Date.now() + 1000 * 60 * 60 * 72).toISOString(),
+      rental_is_permanent: false,
+      rental_expires_at: new Date(Date.now() + 1000 * 60 * 60 * 12).toISOString(),
+      banned_at: null,
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+      invite_credit_balance: 14,
+      token_balance: 86,
+    },
+    {
+      id: "preview-02",
+      username: "beta.permanent",
+      display_name: "Beta Permanent",
+      role: "normal",
+      is_permanent: true,
+      expires_at: null,
+      powder_is_permanent: true,
+      powder_expires_at: null,
+      rental_is_permanent: true,
+      rental_expires_at: null,
+      banned_at: null,
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
+      invite_credit_balance: 32,
+      token_balance: 240,
+    },
+    {
+      id: "preview-03",
+      username: "gamma.expiring",
+      display_name: "Gamma Expiring",
+      role: "normal",
+      is_permanent: false,
+      expires_at: new Date(Date.now() + 1000 * 60 * 60 * 4).toISOString(),
+      powder_is_permanent: false,
+      powder_expires_at: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+      rental_is_permanent: false,
+      rental_expires_at: new Date(Date.now() + 1000 * 60 * 60 * 20).toISOString(),
+      banned_at: null,
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 12).toISOString(),
+      invite_credit_balance: 0,
+      token_balance: 4,
+    },
+    {
+      id: "preview-04",
+      username: "delta.banned",
+      display_name: "Delta Banned",
+      role: "normal",
+      is_permanent: false,
+      expires_at: new Date(Date.now() + 1000 * 60 * 60 * 48).toISOString(),
+      powder_is_permanent: false,
+      powder_expires_at: null,
+      rental_is_permanent: false,
+      rental_expires_at: null,
+      banned_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+      ban_reason: "ตรวจสอบการใช้งานผิดปกติ",
+      created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20).toISOString(),
+      invite_credit_balance: 7,
+      token_balance: 0,
+    },
+    {
+      id: "preview-05",
+      username: "epsilon.new",
+      display_name: "Epsilon New",
+      role: "normal",
+      is_permanent: false,
+      expires_at: null,
+      powder_is_permanent: false,
+      powder_expires_at: null,
+      rental_is_permanent: false,
+      rental_expires_at: null,
+      banned_at: null,
+      created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+      invite_credit_balance: 21,
+      token_balance: 18,
+    },
+  ];
+  const PREVIEW_SETTINGS = {
+    farm_maintenance: false,
+    topup_maintenance: false,
+    signup_closed: false,
+    feature_locks: {
+      partyrun: false,
+      heart: false,
+      powder: false,
+      giftdraw: false,
+      upgrade: false,
+      cookie: false,
+      afterplay_fast: false,
+      unlock_l: true,
+      ice_tower: false,
+    },
+    farm_feature_order: [
+      "partyrun",
+      "heart",
+      "powder",
+      "giftdraw",
+      "upgrade",
+      "cookie",
+      "afterplay_fast",
+      "unlock_l",
+      "ice_tower",
+    ],
+    afterplay_fast_credit_per_run: 2,
+    afterplay_fast_max_runs: 0,
+    afterplay_episode_box_credit_per_run: 3,
+    afterplay_episode_box_max_runs: 50,
+    afterplay_episode_box_enabled: true,
+    unlock_l_credit_each: 8,
+    unlock_l_credit_bundle: 48,
+    unlock_l_treasure_credit: 3,
+    ice_tower_credit_each: 2,
+    ice_tower_credit_bundle: 180,
+    ice_tower_default_stars: 2,
+    ice_tower_default_target_floor: 20,
+    ice_tower_unlock_if_needed: true,
+    ice_tower_allow_customer_star_map: true,
+    afterplay_profile_money_xp: {},
+    afterplay_profile_episode_box: {},
+  };
+  const PREVIEW_STATS = {
+    runs_total: 128,
+    runs: { succeeded: 119, failed: 9 },
+    topups: 26,
+    topups_needs_manual: 2,
+  };
+  const PREVIEW_AUDIT = [
+    { action: "admin_extend_rental", target_user_id: "preview-01", actor_id: "preview-admin", created_at: new Date(Date.now() - 1000 * 60 * 12).toISOString() },
+    { action: "admin_credit_tokens", target_user_id: "preview-02", actor_id: "preview-admin", created_at: new Date(Date.now() - 1000 * 60 * 34).toISOString() },
+    { action: "admin_ban_user", target_user_id: "preview-04", actor_id: "preview-admin", created_at: new Date(Date.now() - 1000 * 60 * 55).toISOString() },
+    { action: "admin_create_user", target_user_id: "preview-05", actor_id: "preview-admin", created_at: new Date(Date.now() - 1000 * 60 * 75).toISOString() },
+  ];
   const { createClient } = supabase;
-  const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  // Keep Supabase Auth in the same storage scope as the Remember me choice.
+  // The default Supabase client persists sessions in localStorage, which would
+  // make an unchecked Remember me box ineffective after a browser restart.
+  function rememberMeEnabled() {
+    try {
+      return localStorage.getItem(REMEMBER_ME_KEY) === "1";
+    } catch (_) {
+      return false;
+    }
+  }
+
+  const authStorage = {
+    getItem(key) {
+      try {
+        if (rememberMeEnabled()) {
+          return localStorage.getItem(key) || sessionStorage.getItem(key);
+        }
+        return sessionStorage.getItem(key);
+      } catch (_) {
+        return null;
+      }
+    },
+    setItem(key, value) {
+      try {
+        const persistent = rememberMeEnabled();
+        const target = persistent ? localStorage : sessionStorage;
+        const other = persistent ? sessionStorage : localStorage;
+        target.setItem(key, value);
+        other.removeItem(key);
+      } catch (_) {}
+    },
+    removeItem(key) {
+      try {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+      } catch (_) {}
+    },
+  };
+
+  const sb = createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+      storage: authStorage,
+    },
+  });
 
   const $ = (id) => document.getElementById(id);
 
@@ -54,6 +258,155 @@
   let lastAudit = [];
   let stuckCount = 0;
   let settingsCache = {};
+  const SETTINGS_SNAPSHOT_KEY = "ckr_admin_last_saved_settings";
+  const SETTINGS_NUMERIC_FIELDS = [
+    "afterplay_fast_credit_per_run",
+    "afterplay_fast_max_runs",
+    "unlock_l_credit_each",
+    "unlock_l_credit_bundle",
+    "unlock_l_treasure_credit",
+    "ice_tower_credit_each",
+    "ice_tower_credit_bundle",
+    "ice_tower_default_stars",
+    "ice_tower_default_target_floor",
+    "afterplay_episode_box_credit_per_run",
+    "afterplay_episode_box_max_runs",
+  ];
+  const SETTINGS_DEFAULTS = {
+    afterplay_fast_credit_per_run: 2,
+    afterplay_fast_max_runs: 0,
+    afterplay_episode_box_credit_per_run: 3,
+    afterplay_episode_box_max_runs: 50,
+  };
+  const SETTINGS_INPUTS = {
+    afterplay_fast_credit_per_run: "set-afterplay-fast-price",
+    afterplay_fast_max_runs: "set-afterplay-fast-max-runs",
+    unlock_l_credit_each: "set-unlock-l-each",
+    unlock_l_credit_bundle: "set-unlock-l-bundle",
+    unlock_l_treasure_credit: "set-unlock-l-treasure",
+    ice_tower_credit_each: "set-ice-tower-each",
+    ice_tower_credit_bundle: "set-ice-tower-bundle",
+    ice_tower_default_stars: "set-ice-tower-default-stars",
+    ice_tower_default_target_floor: "set-ice-tower-default-floor",
+    afterplay_episode_box_credit_per_run: "set-episode-box-price",
+    afterplay_episode_box_max_runs: "set-episode-box-max-runs",
+  };
+  const SETTINGS_BOOLEAN_INPUTS = {
+    farm_maintenance: "set-farm-maint",
+    topup_maintenance: "set-topup-maint",
+    signup_closed: "set-signup-closed",
+    ice_tower_unlock_if_needed: "set-ice-tower-unlock",
+    ice_tower_allow_customer_star_map: "set-ice-tower-allow-map",
+    afterplay_episode_box_enabled: "set-episode-box-enabled",
+  };
+  const SETTINGS_NUMBER_RULES = {
+    afterplay_fast_credit_per_run: { min: 0, max: 1000 },
+    afterplay_fast_max_runs: { min: 0, max: 100000, integer: true },
+    unlock_l_credit_each: { min: 0, max: 10000 },
+    unlock_l_credit_bundle: { min: 0, max: 10000 },
+    unlock_l_treasure_credit: { min: 0, max: 10000 },
+    ice_tower_credit_each: { min: 0, max: 10000 },
+    ice_tower_credit_bundle: { min: 0, max: 10000 },
+    ice_tower_default_stars: { min: 1, max: 3, integer: true },
+    ice_tower_default_target_floor: { min: 1, max: 100, integer: true },
+    afterplay_episode_box_credit_per_run: { min: 0, max: 1000 },
+    afterplay_episode_box_max_runs: { min: 0, max: 100000, integer: true },
+  };
+
+  function readSettingsSnapshot() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_SNAPSHOT_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function persistSettingsSnapshot(data) {
+    try {
+      const snapshot = {};
+      const keys = [
+        ...SETTINGS_NUMERIC_FIELDS,
+        ...Object.keys(SETTINGS_BOOLEAN_INPUTS),
+        "feature_locks",
+        "farm_feature_order",
+        "afterplay_profile_money_xp",
+        "afterplay_profile_episode_box",
+      ];
+      keys.forEach((key) => {
+        if (data && data[key] !== null && data[key] !== undefined) snapshot[key] = data[key];
+      });
+      snapshot.saved_at = new Date().toISOString();
+      localStorage.setItem(SETTINGS_SNAPSHOT_KEY, JSON.stringify(snapshot));
+    } catch (_) {}
+  }
+
+  function normalizeSettings(data, fallback) {
+    const result = {};
+    [readSettingsSnapshot(), fallback || {}, data || {}].forEach((source) => {
+      Object.keys(source || {}).forEach((key) => {
+        const value = source[key];
+        if (value !== null && value !== undefined && value !== "") result[key] = value;
+      });
+    });
+    SETTINGS_NUMERIC_FIELDS.forEach((key) => {
+      if (result[key] === undefined && SETTINGS_DEFAULTS[key] !== undefined) {
+        result[key] = SETTINGS_DEFAULTS[key];
+      }
+    });
+    return result;
+  }
+
+  function readNumberSetting(key, currentValue) {
+    const id = SETTINGS_INPUTS[key];
+    const rule = SETTINGS_NUMBER_RULES[key] || {};
+    const raw = id ? $(id)?.value : undefined;
+    let value = raw !== undefined && String(raw).trim() !== "" ? Number(raw) : Number(currentValue);
+    if (!Number.isFinite(value)) value = Number(SETTINGS_DEFAULTS[key]);
+    if (!Number.isFinite(value)) return undefined;
+    if (rule.integer) value = Math.floor(value);
+    if (Number.isFinite(rule.min)) value = Math.max(rule.min, value);
+    if (Number.isFinite(rule.max)) value = Math.min(rule.max, value);
+    return value;
+  }
+
+  function readSettingsPayloadFromUi() {
+    const payload = {
+      farm_maintenance: !!$(SETTINGS_BOOLEAN_INPUTS.farm_maintenance)?.checked,
+      topup_maintenance: !!$(SETTINGS_BOOLEAN_INPUTS.topup_maintenance)?.checked,
+      signup_closed: !!$(SETTINGS_BOOLEAN_INPUTS.signup_closed)?.checked,
+      feature_locks: readFeatureLocksFromUi(),
+      farm_feature_order: readFeatureOrderFromUi(),
+      ice_tower_unlock_if_needed: !!$(SETTINGS_BOOLEAN_INPUTS.ice_tower_unlock_if_needed)?.checked,
+      ice_tower_allow_customer_star_map: !!$(SETTINGS_BOOLEAN_INPUTS.ice_tower_allow_customer_star_map)?.checked,
+      afterplay_episode_box_enabled: !!$(SETTINGS_BOOLEAN_INPUTS.afterplay_episode_box_enabled)?.checked,
+    };
+    SETTINGS_NUMERIC_FIELDS.forEach((key) => {
+      const value = readNumberSetting(key, settingsCache[key]);
+      if (value !== undefined) payload[key] = value;
+    });
+    return { ...payload, ...readAfterplayProfilesFromUi() };
+  }
+
+  function paintSettingsControls(data) {
+    Object.entries(SETTINGS_BOOLEAN_INPUTS).forEach(([key, id]) => {
+      const input = $(id);
+      if (input && data[key] !== undefined) input.checked = !!data[key];
+    });
+    Object.entries(SETTINGS_INPUTS).forEach(([key, id]) => {
+      const input = $(id);
+      if (input && data[key] !== undefined) input.value = data[key];
+    });
+    const savedAt = $("settings-saved-at");
+    const stamp = readSettingsSnapshot().saved_at || data.saved_at;
+    if (savedAt && stamp) {
+      const date = new Date(stamp);
+      savedAt.textContent = Number.isNaN(date.getTime())
+        ? "ค่าจะยึดตามการบันทึกล่าสุด"
+        : "บันทึกล่าสุด " + date.toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" });
+    }
+  }
   const FEATURE_LOCK_KEYS = [
     "partyrun",
     "heart",
@@ -356,6 +709,11 @@
   }
 
   async function pingApiHealth(retries) {
+    if (PREVIEW_MODE) {
+      apiReady = true;
+      paintApiStatus("ready", "LOCAL PREVIEW");
+      return true;
+    }
     const tries = Math.max(1, Number(retries) || 1);
     paintApiStatus("waking", "กำลังปลุก API…");
     for (let i = 0; i < tries; i++) {
@@ -529,9 +887,23 @@
   });
 
   /* ---- Session / API ---- */
+  function setRememberMePreference(enabled) {
+    try {
+      localStorage.setItem(REMEMBER_ME_KEY, enabled ? "1" : "0");
+    } catch (_) {}
+  }
+
+  function syncRememberMeControl() {
+    const control = $("remember-me");
+    if (control) control.checked = rememberMeEnabled();
+  }
+
   function loadStoredSessionToken() {
     try {
-      return sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
+      if (rememberMeEnabled()) {
+        return localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
+      }
+      return sessionStorage.getItem(SESSION_KEY);
     } catch (_) {
       return null;
     }
@@ -544,7 +916,11 @@
         sessionStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(SESSION_KEY);
       } else {
-        sessionStorage.setItem(SESSION_KEY, token);
+        const persistent = rememberMeEnabled();
+        const target = persistent ? localStorage : sessionStorage;
+        const other = persistent ? sessionStorage : localStorage;
+        target.setItem(SESSION_KEY, token);
+        other.removeItem(SESSION_KEY);
       }
     } catch (_) {}
   }
@@ -780,6 +1156,9 @@
   }
 
   async function api(path, options = {}) {
+    if (PREVIEW_MODE) {
+      throw new Error("Local Preview mode — การกระทำจริงถูกปิดไว้");
+    }
     const headers = Object.assign(
       { "Content-Type": "application/json" },
       options.headers || {}
@@ -1209,6 +1588,12 @@
     });
   }
 
+  function openRentalTask(tab) {
+    if (adminMode === "invite") setMode("day");
+    showView("cashier");
+    showCashierTab(tab || "create");
+  }
+
   function paintOverviewAlerts() {
     const root = $("overview-alerts");
     if (!root) return;
@@ -1407,6 +1792,14 @@
         "<div><dt>บทบาท</dt><dd>" +
         escapeHtml(u.role || "normal") +
         "</dd></div>" +
+        (u.invite_credit_balance != null
+          ? "<div><dt>Invite Credit</dt><dd><strong>" +
+            escapeHtml(String(u.invite_credit_balance)) +
+            "</strong></dd></div>"
+          : "") +
+        (u.token_balance != null
+          ? "<div><dt>Token</dt><dd>" + escapeHtml(String(u.token_balance)) + "</dd></div>"
+          : "") +
         (u.ban_reason
           ? "<div><dt>เหตุผลแบน</dt><dd>" + escapeHtml(u.ban_reason) + "</dd></div>"
           : "") +
@@ -1421,10 +1814,18 @@
         actions.appendChild(
           makeBtn("ต่ออายุ", "btn btn-primary btn-sm", () => {
             closeUserDrawer();
-            showView("cashier");
-            showCashierTab("extend");
+            openRentalTask("extend");
             if ($("extend-q")) $("extend-q").value = u.username || "";
             $("extend-lookup-form")?.requestSubmit();
+          })
+        );
+        actions.appendChild(
+          makeBtn("เติมเครดิต", "btn btn-ghost btn-sm", () => {
+            closeUserDrawer();
+            setMode("invite");
+            showView("cashier");
+            if ($("invite-credit-q")) $("invite-credit-q").value = u.username || "";
+            $("invite-credit-lookup-form")?.requestSubmit();
           })
         );
         if (isPermanent(u)) {
@@ -1646,6 +2047,9 @@
   }
 
   async function invokeAdminRental(body) {
+    if (PREVIEW_MODE) {
+      throw new Error("Local Preview mode — การกระทำจริงถูกปิดไว้");
+    }
     const { data, error } = await sb.functions.invoke(EDGE_ADMIN_FN, {
       body: { product: rentalProduct(), ...body },
     });
@@ -1791,6 +2195,15 @@
   async function loadStuckTopups() {
     const root = $("stuck-topups");
     if (!root) return;
+    if (PREVIEW_MODE) {
+      stuckCount = 2;
+      root.className = "admin-list";
+      root.innerHTML =
+        '<div class="admin-row"><div class="admin-row-head"><strong>7 วัน · ฿350</strong><span class="tag tag-expired">Preview</span></div><div class="muted">ตัวอย่างรายการเติมที่ต้องตรวจสอบ</div></div>' +
+        '<div class="admin-row"><div class="admin-row-head"><strong>30 วัน · ฿990</strong><span class="tag tag-expired">Preview</span></div><div class="muted">ข้อมูลจำลองสำหรับดู layout เท่านั้น</div></div>';
+      paintOverviewAlerts();
+      return;
+    }
     root.className = "admin-list";
     root.innerHTML = skeletonHtml("list");
     try {
@@ -1835,6 +2248,12 @@
   async function loadAudit() {
     const root = $("audit-list");
     const recent = $("recent-activity");
+    if (PREVIEW_MODE) {
+      lastAudit = PREVIEW_AUDIT;
+      paintAuditList();
+      paintRecentActivity();
+      return;
+    }
     if (root) {
       root.className = "admin-list";
       root.innerHTML = skeletonHtml("list");
@@ -1856,6 +2275,12 @@
   async function loadStats() {
     const root = $("daily-stats-cards");
     if (!root) return;
+    if (PREVIEW_MODE) {
+      lastStats = PREVIEW_STATS;
+      paintStatsCards();
+      paintKpis();
+      return;
+    }
     root.className = "mini-stat-grid";
     root.innerHTML = skeletonHtml("stats");
     try {
@@ -2198,64 +2623,49 @@
   }
 
   async function loadSettings() {
+    if (PREVIEW_MODE) {
+      settingsCache = {
+        ...PREVIEW_SETTINGS,
+        feature_locks: { ...PREVIEW_SETTINGS.feature_locks },
+        farm_feature_order: [...PREVIEW_SETTINGS.farm_feature_order],
+      };
+      paintSettingsControls(settingsCache);
+      featureOrderState = normalizeFarmFeatureOrder(settingsCache.farm_feature_order);
+      paintFeatureOrderList();
+      paintFeatureLockToggles(settingsCache.feature_locks);
+      earlyAccessCache = {
+        unlock_l: [{ username: "alpha.demo" }],
+      };
+      paintEarlyAccessEditor();
+      paintAfterplayProfiles(settingsCache);
+      paintOverviewAlerts();
+      return;
+    }
     try {
       const data = await api("/api/admin/settings");
-      settingsCache = data;
-      if ($("set-farm-maint")) $("set-farm-maint").checked = !!data.farm_maintenance;
-      if ($("set-topup-maint")) $("set-topup-maint").checked = !!data.topup_maintenance;
-      if ($("set-signup-closed")) $("set-signup-closed").checked = !!data.signup_closed;
-      featureOrderState = normalizeFarmFeatureOrder(data.farm_feature_order);
+      settingsCache = normalizeSettings(data, settingsCache);
+      paintSettingsControls(settingsCache);
+      featureOrderState = normalizeFarmFeatureOrder(settingsCache.farm_feature_order);
       paintFeatureOrderList();
-      paintFeatureLockToggles(data.feature_locks);
+      paintFeatureLockToggles(settingsCache.feature_locks);
       loadEarlyAccess().catch(() => {});
-      if ($("set-afterplay-fast-price") && data.afterplay_fast_credit_per_run != null) {
-        $("set-afterplay-fast-price").value = data.afterplay_fast_credit_per_run;
-      }
-      if ($("set-afterplay-fast-max-runs") && data.afterplay_fast_max_runs != null) {
-        $("set-afterplay-fast-max-runs").value = data.afterplay_fast_max_runs;
-      }
-      if ($("set-unlock-l-each") && data.unlock_l_credit_each != null) {
-        $("set-unlock-l-each").value = data.unlock_l_credit_each;
-      }
-      if ($("set-unlock-l-bundle") && data.unlock_l_credit_bundle != null) {
-        $("set-unlock-l-bundle").value = data.unlock_l_credit_bundle;
-      }
-      if ($("set-unlock-l-treasure") && data.unlock_l_treasure_credit != null) {
-        $("set-unlock-l-treasure").value = data.unlock_l_treasure_credit;
-      }
-      if ($("set-ice-tower-each") && data.ice_tower_credit_each != null) {
-        $("set-ice-tower-each").value = data.ice_tower_credit_each;
-      }
-      if ($("set-ice-tower-bundle") && data.ice_tower_credit_bundle != null) {
-        $("set-ice-tower-bundle").value = data.ice_tower_credit_bundle;
-      }
-      if ($("set-ice-tower-default-stars") && data.ice_tower_default_stars != null) {
-        $("set-ice-tower-default-stars").value = data.ice_tower_default_stars;
-      }
-      if ($("set-ice-tower-default-floor") && data.ice_tower_default_target_floor != null) {
-        $("set-ice-tower-default-floor").value = data.ice_tower_default_target_floor;
-      }
-      if ($("set-ice-tower-unlock")) {
-        $("set-ice-tower-unlock").checked = data.ice_tower_unlock_if_needed !== false;
-      }
-      if ($("set-ice-tower-allow-map")) {
-        $("set-ice-tower-allow-map").checked = data.ice_tower_allow_customer_star_map !== false;
-      }
-      if ($("set-episode-box-price") && data.afterplay_episode_box_credit_per_run != null) {
-        $("set-episode-box-price").value = data.afterplay_episode_box_credit_per_run;
-      }
-      if ($("set-episode-box-max-runs") && data.afterplay_episode_box_max_runs != null) {
-        $("set-episode-box-max-runs").value = data.afterplay_episode_box_max_runs;
-      }
-      if ($("set-episode-box-enabled")) {
-        $("set-episode-box-enabled").checked = data.afterplay_episode_box_enabled !== false;
-      }
-      paintAfterplayProfiles(data);
+      paintAfterplayProfiles(settingsCache);
       paintOverviewAlerts();
       loadAdminProxy().catch(() => {});
       loadHeartHelpers().catch(() => {});
       loadInvitePoolStats().catch(() => {});
-    } catch (_) {}
+    } catch (err) {
+      const recovered = normalizeSettings({}, settingsCache);
+      if (Object.keys(recovered).length) {
+        settingsCache = recovered;
+        paintSettingsControls(settingsCache);
+        featureOrderState = normalizeFarmFeatureOrder(settingsCache.farm_feature_order);
+        paintFeatureOrderList();
+        paintFeatureLockToggles(settingsCache.feature_locks);
+        paintAfterplayProfiles(settingsCache);
+      }
+      setStatus($("settings-status"), err.message || String(err), "err");
+    }
   }
 
   function paintProxyBadge(state, label) {
@@ -2330,6 +2740,16 @@
 
   async function loadInvitePoolStats() {
     const el = $("invite-pool-stats");
+    if (PREVIEW_MODE) {
+      if (el) el.textContent = "Ready: 24 · Links: 3 · Reserved: 1 · Spent: 18 · (29 guest/link)";
+      return {
+        ready: 24,
+        links_available: 3,
+        reserved: 1,
+        spent: 18,
+        guests_per_link: 29,
+      };
+    }
     try {
       const data = await api("/api/admin/invite-pool/stats");
       if (el) {
@@ -2813,6 +3233,17 @@
     const listStatus = $("list-status");
     const body = $("users-body");
     const cards = $("users-cards");
+    if (PREVIEW_MODE) {
+      cachedUsers = PREVIEW_USERS.map((u) => ({ ...u }));
+      usersVisibleLimit = USERS_PAGE;
+      renderUsers();
+      paintKpis();
+      if (listStatus) {
+        listStatus.textContent = "ข้อมูลจำลองสำหรับ Preview เท่านั้น";
+        listStatus.className = "status muted";
+      }
+      return;
+    }
     if (body) body.innerHTML = skeletonHtml("table");
     if (cards) cards.innerHTML = skeletonHtml("cards");
     try {
@@ -2844,6 +3275,7 @@
   async function showDash(profile) {
     loginPanel.classList.add("hidden");
     dash.classList.remove("hidden");
+    $("preview-banner")?.classList.toggle("hidden", !PREVIEW_MODE);
     adminId = profile.id || null;
     const whoName = profile.username || profile.display_name || "admin";
     if ($("who-user")) $("who-user").textContent = whoName;
@@ -3003,8 +3435,8 @@
     const query = (q || "").trim().toLowerCase();
     const items = [];
     const cmds = [
-      { id: "cmd-create", label: "สร้างบัญชี", meta: "แคชเชียร์", run: () => { showView("cashier"); showCashierTab("create"); } },
-      { id: "cmd-extend", label: "ต่ออายุ", meta: "แคชเชียร์", run: () => { showView("cashier"); showCashierTab("extend"); } },
+      { id: "cmd-create", label: "สร้างบัญชี", meta: "แคชเชียร์", run: () => openRentalTask("create") },
+      { id: "cmd-extend", label: "ต่ออายุ", meta: "แคชเชียร์", run: () => openRentalTask("extend") },
       { id: "cmd-users", label: "ไปหน้าผู้ใช้", meta: "นำทาง", run: () => showView("users") },
       { id: "cmd-overview", label: "ไปหน้าภาพรวม", meta: "นำทาง", run: () => showView("overview") },
       { id: "cmd-system", label: "ไปหน้าระบบ", meta: "นำทาง", run: () => showView("system") },
@@ -3140,6 +3572,23 @@
     } catch (_) {}
     const btn = $("density-btn");
     if (btn) btn.textContent = compact ? "หนาแน่น: แน่น" : "หนาแน่น: สบาย";
+  }
+
+  function applyTheme(theme) {
+    const light = theme === "light";
+    document.body?.classList.toggle("theme-light", light);
+    document.body?.classList.toggle("theme-dark", !light);
+    try {
+      localStorage.setItem(THEME_KEY, light ? "light" : "dark");
+    } catch (_) {}
+    const btn = $("theme-btn");
+    if (btn) {
+      btn.textContent = light ? "โหมดมืด" : "โหมดสว่าง";
+      btn.title = light ? "เปลี่ยนเป็น Dark mode" : "เปลี่ยนเป็น Light mode";
+      btn.setAttribute("aria-pressed", light ? "false" : "true");
+    }
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute("content", light ? "#f5f5f5" : "#090909");
   }
 
   function clearUserFilters() {
@@ -3449,10 +3898,19 @@
     applyDensity(compact ? "compact" : "comfortable");
   });
 
+  $("theme-btn")?.addEventListener("click", () => {
+    applyTheme(document.body?.classList.contains("theme-light") ? "dark" : "light");
+  });
+
   try {
     applyDensity(localStorage.getItem(DENSITY_KEY) === "compact" ? "compact" : "comfortable");
   } catch (_) {
     applyDensity("comfortable");
+  }
+  try {
+    applyTheme(localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark");
+  } catch (_) {
+    applyTheme("dark");
   }
 
   document.querySelectorAll("[data-cashier-tab]").forEach((btn) => {
@@ -3491,13 +3949,16 @@
         $("users-search")?.focus();
       }
       if (s === "create-user") {
-        showView("cashier");
-        showCashierTab("create");
+        openRentalTask("create");
       }
       if (s === "extend-user") {
-        showView("cashier");
-        showCashierTab("extend");
+        openRentalTask("extend");
         $("extend-q")?.focus();
+      }
+      if (s === "credit-user") {
+        setMode("invite");
+        showView("cashier");
+        $("invite-credit-q")?.focus();
       }
       if (s === "stuck-topups") {
         showView("system");
@@ -3514,6 +3975,7 @@
     setBtnLoading($("login-btn"), true);
     setStatus($("login-status"), "กำลังเข้าสู่ระบบ…", "muted");
     try {
+      setRememberMePreference(!!$("remember-me")?.checked);
       await ensureApiReady();
       const data = await api("/api/auth/login", {
         method: "POST",
@@ -3559,6 +4021,14 @@
 
   $("logout-btn-mobile")?.addEventListener("click", () => {
     $("logout-btn")?.click();
+  });
+
+  $("preview-exit-btn")?.addEventListener("click", () => {
+    if (PREVIEW_MODE) {
+      location.href = location.pathname;
+    } else {
+      showLogin();
+    }
   });
 
   $("refresh-btn")?.addEventListener("click", () => loadUsers());
@@ -3611,55 +4081,24 @@
     setBtnLoading($("save-settings-btn"), true);
     setStatus($("settings-status"), "กำลังบันทึก…", "muted");
     try {
-      await api("/api/admin/settings", {
+      const payload = readSettingsPayloadFromUi();
+      const response = await api("/api/admin/settings", {
         method: "POST",
-        body: {
-          farm_maintenance: !!$("set-farm-maint")?.checked,
-          topup_maintenance: !!$("set-topup-maint")?.checked,
-          signup_closed: !!$("set-signup-closed")?.checked,
-          feature_locks: readFeatureLocksFromUi(),
-          farm_feature_order: readFeatureOrderFromUi(),
-          ...(Number.isFinite(Number($("set-afterplay-fast-price")?.value))
-            ? { afterplay_fast_credit_per_run: Number($("set-afterplay-fast-price").value) }
-            : {}),
-          ...(Number.isFinite(Number($("set-afterplay-fast-max-runs")?.value))
-            ? { afterplay_fast_max_runs: Math.max(0, Math.floor(Number($("set-afterplay-fast-max-runs").value))) }
-            : {}),
-          ...(Number.isFinite(Number($("set-unlock-l-each")?.value))
-            ? { unlock_l_credit_each: Number($("set-unlock-l-each").value) }
-            : {}),
-          ...(Number.isFinite(Number($("set-unlock-l-bundle")?.value))
-            ? { unlock_l_credit_bundle: Number($("set-unlock-l-bundle").value) }
-            : {}),
-          ...(Number.isFinite(Number($("set-unlock-l-treasure")?.value))
-            ? { unlock_l_treasure_credit: Number($("set-unlock-l-treasure").value) }
-            : {}),
-          ...(Number.isFinite(Number($("set-ice-tower-each")?.value))
-            ? { ice_tower_credit_each: Number($("set-ice-tower-each").value) }
-            : {}),
-          ...(Number.isFinite(Number($("set-ice-tower-bundle")?.value))
-            ? { ice_tower_credit_bundle: Number($("set-ice-tower-bundle").value) }
-            : {}),
-          ...(Number.isFinite(Number($("set-ice-tower-default-stars")?.value))
-            ? { ice_tower_default_stars: Math.max(1, Math.min(3, Math.floor(Number($("set-ice-tower-default-stars").value)))) }
-            : {}),
-          ...(Number.isFinite(Number($("set-ice-tower-default-floor")?.value))
-            ? { ice_tower_default_target_floor: Math.max(1, Math.min(100, Math.floor(Number($("set-ice-tower-default-floor").value)))) }
-            : {}),
-          ice_tower_unlock_if_needed: !!$("set-ice-tower-unlock")?.checked,
-          ice_tower_allow_customer_star_map: !!$("set-ice-tower-allow-map")?.checked,
-          ...(Number.isFinite(Number($("set-episode-box-price")?.value))
-            ? { afterplay_episode_box_credit_per_run: Number($("set-episode-box-price").value) }
-            : {}),
-          ...(Number.isFinite(Number($("set-episode-box-max-runs")?.value))
-            ? { afterplay_episode_box_max_runs: Math.max(0, Math.floor(Number($("set-episode-box-max-runs").value))) }
-            : {}),
-          afterplay_episode_box_enabled: !!$("set-episode-box-enabled")?.checked,
-          ...readAfterplayProfilesFromUi(),
-        },
+        body: payload,
       });
+      settingsCache = normalizeSettings(
+        response?.settings || response,
+        normalizeSettings({ ...settingsCache, ...payload }, settingsCache)
+      );
+      paintSettingsControls(settingsCache);
+      featureOrderState = normalizeFarmFeatureOrder(settingsCache.farm_feature_order);
+      paintFeatureOrderList();
+      paintFeatureLockToggles(settingsCache.feature_locks);
+      paintAfterplayProfiles(settingsCache);
+      persistSettingsSnapshot(settingsCache);
+      paintSettingsControls(settingsCache);
       setStatus($("settings-status"), "บันทึกแล้ว", "ok");
-      await Promise.all([loadSettings(), loadAudit()]);
+      await loadAudit();
     } catch (err) {
       setStatus($("settings-status"), err.message || String(err), "err");
     } finally {
@@ -3674,12 +4113,19 @@
     setBtnLoading($("save-afterplay-profiles-btn"), true);
     setStatus($("ap-profile-status"), "กำลังบันทึก…", "muted");
     try {
-      await api("/api/admin/settings", {
+      const payload = readAfterplayProfilesFromUi();
+      const response = await api("/api/admin/settings", {
         method: "POST",
-        body: readAfterplayProfilesFromUi(),
+        body: payload,
       });
+      settingsCache = normalizeSettings(response?.settings || response, {
+        ...settingsCache,
+        ...payload,
+      });
+      paintAfterplayProfiles(settingsCache);
+      persistSettingsSnapshot(settingsCache);
       setStatus($("ap-profile-status"), "บันทึกโปรไฟล์แล้ว", "ok");
-      await Promise.all([loadSettings(), loadAudit()]);
+      await loadAudit();
     } catch (err) {
       setStatus($("ap-profile-status"), err.message || String(err), "err");
     } finally {
@@ -3962,10 +4408,17 @@
     }
   });
 
+  syncRememberMeControl();
   sessionToken = loadStoredSessionToken();
   pingApiHealth(2).catch(() => {});
 
   (async () => {
+    if (PREVIEW_MODE) {
+      accessToken = "local-preview";
+      sessionToken = "local-preview";
+      await showDash(PREVIEW_PROFILE);
+      return;
+    }
     const ctx = await requireAdminSession();
     if (ctx) await showDash(ctx.profile);
   })();
