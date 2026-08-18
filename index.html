@@ -500,6 +500,22 @@
                   <input type="checkbox" id="set-ice-tower-allow-map" checked />
                   <span>ให้ลูกค้าตั้งดาวเป้าหมายได้</span>
                 </label>
+                <label class="field">
+                  <span>เพื่อน · เพดานเพิ่มต่องาน</span>
+                  <input id="set-friend-max-add" type="number" inputmode="numeric" step="1" min="1" max="300" />
+                </label>
+                <label class="toggle-field">
+                  <input type="checkbox" id="set-auto-redeem-enabled" />
+                  <span>เปิด Auto Redeem ให้ลูกค้า (ค่าเริ่มต้นปิด)</span>
+                </label>
+                <label class="field">
+                  <span>Auto Redeem · จำนวนโค้ดสูงสุด</span>
+                  <input id="set-auto-redeem-max-codes" type="number" inputmode="numeric" step="1" min="1" max="8" />
+                </label>
+                <label class="field grow">
+                  <span>Auto Redeem · โค้ดเริ่มต้น (คั่นด้วยจุลภาค)</span>
+                  <textarea id="set-auto-redeem-coupons" rows="3" spellcheck="false">Cookierunclassic2m,Cookierunclassic1m,COOKIERUNCLASSICNO1,AMAZINGKIWICOOK2</textarea>
+                </label>
               </div>
               <p class="muted settings-hint">เพดานรอบ: 0 = ไม่จำกัด จนกว่าจะถึงเป้าที่ลูกค้าใส่หรือระบบคำนวณ</p>
               <div class="settings-row settings-actions">

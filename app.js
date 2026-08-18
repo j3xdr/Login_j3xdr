@@ -131,6 +131,8 @@
       afterplay_fast: false,
       unlock_l: true,
       ice_tower: false,
+      friend: false,
+      auto_redeem: true,
     },
     farm_feature_order: [
       "partyrun",
@@ -139,6 +141,8 @@
       "giftdraw",
       "upgrade",
       "cookie",
+      "friend",
+      "auto_redeem",
       "afterplay_fast",
       "unlock_l",
       "ice_tower",
@@ -157,6 +161,10 @@
     ice_tower_default_target_floor: 20,
     ice_tower_unlock_if_needed: true,
     ice_tower_allow_customer_star_map: true,
+    friend_max_add: 300,
+    auto_redeem_enabled: false,
+    auto_redeem_max_codes: 8,
+    auto_redeem_default_coupons: "Cookierunclassic2m,Cookierunclassic1m,COOKIERUNCLASSICNO1,AMAZINGKIWICOOK2",
     afterplay_profile_money_xp: {},
     afterplay_profile_episode_box: {},
   };
@@ -269,6 +277,8 @@
     "ice_tower_credit_bundle",
     "ice_tower_default_stars",
     "ice_tower_default_target_floor",
+    "friend_max_add",
+    "auto_redeem_max_codes",
     "afterplay_episode_box_credit_per_run",
     "afterplay_episode_box_max_runs",
   ];
@@ -288,6 +298,8 @@
     ice_tower_credit_bundle: "set-ice-tower-bundle",
     ice_tower_default_stars: "set-ice-tower-default-stars",
     ice_tower_default_target_floor: "set-ice-tower-default-floor",
+    friend_max_add: "set-friend-max-add",
+    auto_redeem_max_codes: "set-auto-redeem-max-codes",
     afterplay_episode_box_credit_per_run: "set-episode-box-price",
     afterplay_episode_box_max_runs: "set-episode-box-max-runs",
   };
@@ -297,6 +309,7 @@
     signup_closed: "set-signup-closed",
     ice_tower_unlock_if_needed: "set-ice-tower-unlock",
     ice_tower_allow_customer_star_map: "set-ice-tower-allow-map",
+    auto_redeem_enabled: "set-auto-redeem-enabled",
     afterplay_episode_box_enabled: "set-episode-box-enabled",
   };
   const SETTINGS_NUMBER_RULES = {
@@ -309,6 +322,8 @@
     ice_tower_credit_bundle: { min: 0, max: 10000 },
     ice_tower_default_stars: { min: 1, max: 3, integer: true },
     ice_tower_default_target_floor: { min: 1, max: 100, integer: true },
+    friend_max_add: { min: 1, max: 300, integer: true },
+    auto_redeem_max_codes: { min: 1, max: 8, integer: true },
     afterplay_episode_box_credit_per_run: { min: 0, max: 1000 },
     afterplay_episode_box_max_runs: { min: 0, max: 100000, integer: true },
   };
@@ -333,6 +348,7 @@
         "farm_feature_order",
         "afterplay_profile_money_xp",
         "afterplay_profile_episode_box",
+        "auto_redeem_default_coupons",
       ];
       keys.forEach((key) => {
         if (data && data[key] !== null && data[key] !== undefined) snapshot[key] = data[key];
@@ -380,13 +396,16 @@
       farm_feature_order: readFeatureOrderFromUi(),
       feature_catalog: readFeatureCatalogFromUi(),
       ice_tower_unlock_if_needed: !!$(SETTINGS_BOOLEAN_INPUTS.ice_tower_unlock_if_needed)?.checked,
-      ice_tower_allow_customer_star_map: !!$(SETTINGS_BOOLEAN_INPUTS.ice_tower_allow_customer_star_map)?.checked,
-      afterplay_episode_box_enabled: !!$(SETTINGS_BOOLEAN_INPUTS.afterplay_episode_box_enabled)?.checked,
-    };
+    ice_tower_allow_customer_star_map: !!$(SETTINGS_BOOLEAN_INPUTS.ice_tower_allow_customer_star_map)?.checked,
+    auto_redeem_enabled: !!$(SETTINGS_BOOLEAN_INPUTS.auto_redeem_enabled)?.checked,
+    afterplay_episode_box_enabled: !!$(SETTINGS_BOOLEAN_INPUTS.afterplay_episode_box_enabled)?.checked,
+  };
     SETTINGS_NUMERIC_FIELDS.forEach((key) => {
       const value = readNumberSetting(key, settingsCache[key]);
       if (value !== undefined) payload[key] = value;
     });
+    const coupons = $("set-auto-redeem-coupons")?.value;
+    if (coupons != null) payload.auto_redeem_default_coupons = String(coupons).trim();
     return { ...payload, ...readAfterplayProfilesFromUi() };
   }
 
@@ -399,6 +418,10 @@
       const input = $(id);
       if (input && data[key] !== undefined) input.value = data[key];
     });
+    if ($("set-auto-redeem-coupons") && data.auto_redeem_default_coupons != null) {
+      const raw = data.auto_redeem_default_coupons;
+      $("set-auto-redeem-coupons").value = Array.isArray(raw) ? raw.join(",") : String(raw);
+    }
     const savedAt = $("settings-saved-at");
     const stamp = readSettingsSnapshot().saved_at || data.saved_at;
     if (savedAt && stamp) {
@@ -418,6 +441,8 @@
     "afterplay_fast",
     "unlock_l",
     "ice_tower",
+    "friend",
+    "auto_redeem",
   ];
   const FEATURE_LOCK_LABELS = {
     partyrun: "Party Run",
@@ -429,6 +454,8 @@
     afterplay_fast: "ฟาร์มเงิน/XP",
     unlock_l: "ปลดล็อค L",
     ice_tower: "Ice Tower",
+    friend: "เพื่อน (ทดสอบ)",
+    auto_redeem: "Auto Redeem (ทดสอบ)",
   };
   const DEFAULT_FEATURE_ICONS = {
     partyrun: "pirate_cookie_run.gif",
@@ -440,6 +467,8 @@
     afterplay_fast: "Cookie0023_head.png",
     unlock_l: "Tiger_Lily_Cookie.png",
     ice_tower: "ice_tower.png",
+    friend: "Angel_cookie.png",
+    auto_redeem: "gem.png",
   };
   const SHOP_ASSET_BASE = "https://crgwwdc.shop/assets/";
   const DEFAULT_FARM_FEATURE_ORDER = [
@@ -449,6 +478,8 @@
     "giftdraw",
     "upgrade",
     "cookie",
+    "friend",
+    "auto_redeem",
     "afterplay_fast",
     "unlock_l",
     "ice_tower",
