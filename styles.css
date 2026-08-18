@@ -530,9 +530,6 @@ input:focus, .select-input:focus, .prompt-input:focus {
 .pos-shell.mode-web .kpi-web { display: block; }
 .mode-invite-only { display: none; }
 .pos-shell.mode-invite .mode-invite-only { display: block; }
-.mode-web-or-invite { display: none; }
-.pos-shell.mode-web .mode-web-or-invite,
-.pos-shell.mode-invite .mode-web-or-invite { display: block; }
 .pos-shell.mode-invite .mode-rental-only { display: none; }
 .invite-credit-form { margin-top: 12px; display: grid; gap: 10px; }
 

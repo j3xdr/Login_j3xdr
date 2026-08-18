@@ -2230,9 +2230,7 @@
     if ($("sidebar-mode-label")) {
       $("sidebar-mode-label").textContent = modeLabels[adminMode];
     }
-    if (adminMode === "invite" || adminMode === "web") {
-      loadInvitePoolStats().catch(() => {});
-    }
+    loadInvitePoolStats().catch(() => {});
     loadUsers();
     paintKpis();
     paintOverviewAlerts();
