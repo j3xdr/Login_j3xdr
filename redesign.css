@@ -131,6 +131,12 @@
   border-bottom: 1px solid var(--line);
 }
 
+.monitor-job {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
 .monitor-row:last-child,
 .monitor-job:last-child,
 .monitor-user-summary:last-child {
@@ -187,6 +193,48 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.monitor-job-log {
+  grid-column: 1 / -1;
+  margin-top: 2px;
+  color: var(--muted-strong);
+}
+
+.monitor-job-log summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.monitor-log-body {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.monitor-log-meta,
+.monitor-log-error,
+.monitor-log-empty {
+  margin: 0 0 8px;
+}
+
+.monitor-log-error { color: var(--danger); }
+
+.monitor-log-lines {
+  max-height: 280px;
+  margin: 0;
+  padding-left: 20px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .monitor-user-link {

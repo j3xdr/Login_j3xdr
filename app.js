@@ -264,6 +264,8 @@
   let cachedUsers = [];
   let monitorData = null;
   let monitorTimer = null;
+  const monitorJobLogCache = new Map();
+  const monitorJobLogLoading = new Set();
   let lastStats = null;
   let lastAudit = [];
   let stuckCount = 0;
@@ -2056,7 +2058,7 @@
       }
       root.innerHTML =
         "<strong>ประวัติงาน <span class=\"muted\">(" + escapeHtml(String(data.total ?? items.length)) + " งาน)</span></strong>" +
-        items.map((row) => '<div class="activity-row"><b>' + escapeHtml(row.kind || "งาน") + '</b> · <span class="monitor-status is-' + escapeHtml(row.status || "unknown") + '">' + escapeHtml(row.status || "—") + "</span><small>" + escapeHtml(formatMonitorTime(row.finished_at || row.started_at || row.created_at)) + "</small>" + (row.error ? '<small class="monitor-error">' + escapeHtml(row.error) + "</small>" : "") + "</div>").join("");
+        items.map((row) => '<div class="activity-row"><b>' + escapeHtml(row.kind || "งาน") + '</b> · <span class="monitor-status is-' + escapeHtml(row.status || "unknown") + '">' + escapeHtml(row.status || "—") + "</span><small>" + escapeHtml(formatMonitorTime(row.finished_at || row.started_at || row.created_at)) + "</small>" + (row.error ? '<small class="monitor-error">' + escapeHtml(row.error) + "</small>" : "") + monitorJobLogMarkup(row.job_id) + "</div>").join("");
     } catch (e) {
       root.textContent = "โหลดประวัติงานไม่สำเร็จ: " + (e.message || String(e));
     }
@@ -2313,6 +2315,64 @@
     return new Intl.DateTimeFormat("th-TH", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
   }
 
+  function monitorJobLogMarkup(jobId) {
+    const id = String(jobId || "").trim();
+    if (!id) return "";
+    return '<details class="monitor-job-log"><summary data-monitor-job-log="' + escapeHtml(id) + '">ดู Log รายการนี้</summary><div class="monitor-log-body muted" data-monitor-log-body="' + escapeHtml(id) + '">เปิดเพื่อโหลด Log</div></details>';
+  }
+
+  function monitorJobLogTargets(jobId) {
+    const id = String(jobId || "");
+    return Array.from(document.querySelectorAll("[data-monitor-log-body]")).filter((el) => el.dataset.monitorLogBody === id);
+  }
+
+  function renderMonitorJobLog(jobId, html) {
+    monitorJobLogTargets(jobId).forEach((el) => { el.innerHTML = html; });
+  }
+
+  function monitorJobLogContent(detail) {
+    const logs = Array.isArray(detail?.logs) ? detail.logs.map((line) => String(line)) : [];
+    const progress = detail?.progress && typeof detail.progress === "object" ? detail.progress : {};
+    const progressBits = [];
+    if (progress.phase) progressBits.push("ขั้นตอน: " + String(progress.phase));
+    if (Number.isFinite(Number(progress.current)) || Number.isFinite(Number(progress.total))) {
+      progressBits.push("ความคืบหน้า: " + String(progress.current || 0) + "/" + String(progress.total || 0));
+    }
+    const meta = [
+      progressBits.length ? '<div class="monitor-log-meta">' + escapeHtml(progressBits.join(" · ")) + "</div>" : "",
+      detail?.error ? '<div class="monitor-log-error">ข้อผิดพลาด: ' + escapeHtml(detail.error) + "</div>" : "",
+    ].join("");
+    if (!logs.length) return meta + '<p class="monitor-log-empty">งานนี้ยังไม่มี Log ที่บันทึกไว้</p>';
+    return meta + '<ol class="monitor-log-lines">' + logs.map((line) => "<li>" + escapeHtml(line) + "</li>").join("") + "</ol>";
+  }
+
+  async function loadMonitorJobLog(jobId) {
+    const id = String(jobId || "").trim();
+    if (!id) return;
+    const cached = monitorJobLogCache.get(id);
+    if (cached) {
+      renderMonitorJobLog(id, monitorJobLogContent(cached));
+      return;
+    }
+    if (monitorJobLogLoading.has(id)) {
+      renderMonitorJobLog(id, "กำลังโหลด Log…");
+      return;
+    }
+    monitorJobLogLoading.add(id);
+    renderMonitorJobLog(id, "กำลังโหลด Log…");
+    try {
+      const detail = PREVIEW_MODE
+        ? { logs: ["[preview] เริ่มงาน", "[preview] Worker รับงานแล้ว", "[preview] งานกำลังดำเนินการ"], progress: { phase: "run", current: 2, total: 3 } }
+        : await api("/api/admin/jobs/" + encodeURIComponent(id));
+      monitorJobLogCache.set(id, detail || {});
+      renderMonitorJobLog(id, monitorJobLogContent(detail || {}));
+    } catch (e) {
+      renderMonitorJobLog(id, '<span class="monitor-log-error">โหลด Log ไม่สำเร็จ: ' + escapeHtml(e.message || String(e)) + "</span>");
+    } finally {
+      monitorJobLogLoading.delete(id);
+    }
+  }
+
   function previewMonitorPayload() {
     const now = new Date();
     const iso = (mins) => new Date(now.getTime() - mins * 60000).toISOString();
@@ -2366,7 +2426,7 @@
     });
     const jobs = [...jobIndex.values()].filter((row) => monitorSearchMatches(row, query) && (status === "all" || row.status === status));
     const jobsRoot = $("monitor-jobs");
-    if (jobsRoot) jobsRoot.innerHTML = jobs.length ? jobs.map((row) => `<article class="monitor-job"><div><button type="button" class="monitor-user-link" data-monitor-user="${escapeHtml(row.user_id || "")}">${escapeHtml(row.username || "—")}</button><b>${escapeHtml(row.kind || "งาน")}</b><small>${escapeHtml(formatMonitorTime(row.finished_at || row.started_at || row.created_at))}${row.claimed_by ? " · " + escapeHtml(row.claimed_by) : ""}</small></div><div><span class="monitor-status is-${escapeHtml(row.status || "unknown")}">${escapeHtml(row.status || "—")}</span>${row.error ? `<small class="monitor-error">${escapeHtml(row.error)}</small>` : ""}</div></article>`).join("") : "ไม่พบงานตามตัวกรอง";
+    if (jobsRoot) jobsRoot.innerHTML = jobs.length ? jobs.map((row) => `<article class="monitor-job"><div><button type="button" class="monitor-user-link" data-monitor-user="${escapeHtml(row.user_id || "")}">${escapeHtml(row.username || "—")}</button><b>${escapeHtml(row.kind || "งาน")}</b><small>${escapeHtml(formatMonitorTime(row.finished_at || row.started_at || row.created_at))}${row.claimed_by ? " · " + escapeHtml(row.claimed_by) : ""}</small></div><div><span class="monitor-status is-${escapeHtml(row.status || "unknown")}">${escapeHtml(row.status || "—")}</span>${row.error ? `<small class="monitor-error">${escapeHtml(row.error)}</small>` : ""}</div>${monitorJobLogMarkup(row.job_id)}</article>`).join("") : "ไม่พบงานตามตัวกรอง";
     const userRoot = $("monitor-users");
     const users = (data.users || []).filter((row) => monitorSearchMatches(row, query));
     if ($("monitor-user-scope")) $("monitor-user-scope").textContent = "สรุปจากงานล่าสุด " + (data.activity_window ?? 0) + " รายการ";
@@ -4408,6 +4468,17 @@
   $("refresh-monitor-btn")?.addEventListener("click", () => loadMonitor());
   $("monitor-search")?.addEventListener("input", () => renderMonitor());
   $("monitor-status-filter")?.addEventListener("change", () => renderMonitor());
+  function handleMonitorJobLogClick(e) {
+    const summary = e.target.closest("[data-monitor-job-log]");
+    if (!summary) return;
+    const details = summary.closest("details");
+    const jobId = summary.getAttribute("data-monitor-job-log");
+    window.setTimeout(() => {
+      if (details?.open) loadMonitorJobLog(jobId);
+    }, 0);
+  }
+  $("view-monitor")?.addEventListener("click", handleMonitorJobLogClick);
+  $("drawer-body")?.addEventListener("click", handleMonitorJobLogClick);
   $("view-monitor")?.addEventListener("click", (e) => {
     const button = e.target.closest("[data-monitor-user]");
     if (!button) return;
