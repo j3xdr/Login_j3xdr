@@ -36,6 +36,201 @@
   color-scheme: light;
 }
 
+/* Editable TrueMoney rental package catalog */
+.topup-packages-admin-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.topup-package-admin-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.5fr) 120px 110px 110px 110px auto;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.1));
+  border-radius: 12px;
+  background: var(--panel-soft, rgba(255, 255, 255, 0.025));
+}
+
+.topup-package-admin-row .field {
+  min-width: 0;
+}
+
+.topup-package-admin-row .package-active-field {
+  align-self: center;
+  white-space: nowrap;
+}
+
+.topup-package-admin-row .package-id-note {
+  grid-column: 1 / -1;
+  font-size: 0.78rem;
+}
+
+.topup-package-admin-row .package-kind-feature,
+.topup-package-admin-row .package-kind-full {
+  display: none;
+}
+
+.topup-package-admin-row.is-feature .package-kind-feature {
+  display: block;
+}
+
+.topup-package-admin-row.is-full .package-kind-full {
+  display: block;
+}
+
+/* Settings categories and live worker monitor */
+.settings-group {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+}
+
+.settings-group h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.settings-group .settings-hint:first-of-type {
+  margin-top: 0;
+}
+
+.settings-save-group {
+  background: var(--bg-panel);
+}
+
+.monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.monitor-wide {
+  margin-top: 16px;
+}
+
+.monitor-list,
+.monitor-jobs {
+  display: grid;
+  gap: 8px;
+}
+
+.monitor-row,
+.monitor-job,
+.monitor-user-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.monitor-row:last-child,
+.monitor-job:last-child,
+.monitor-user-summary:last-child {
+  border-bottom: 0;
+}
+
+.monitor-row > div,
+.monitor-job > div,
+.monitor-user-summary {
+  min-width: 0;
+}
+
+.monitor-row small,
+.monitor-job small,
+.monitor-user-summary small,
+.drawer-history small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.monitor-dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.monitor-dot.is-live { background: var(--ok); border-color: var(--ok); }
+
+.monitor-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.monitor-status.is-running { color: var(--accent); border-color: var(--accent); }
+.monitor-status.is-queued { color: var(--warn); border-color: var(--warn); }
+.monitor-status.is-succeeded { color: var(--ok); border-color: var(--ok); }
+.monitor-status.is-failed, .monitor-status.is-cancelled { color: var(--danger); border-color: var(--danger); }
+
+.monitor-error {
+  max-width: 250px;
+  color: var(--danger) !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.monitor-user-link {
+  padding: 0;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.monitor-user-summary {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto minmax(220px, 2fr);
+}
+
+.drawer-history {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.drawer-history .activity-row {
+  margin-top: 7px;
+}
+
+@media (max-width: 900px) {
+  .topup-package-admin-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .monitor-grid { grid-template-columns: 1fr; }
+  .monitor-user-summary { grid-template-columns: 1fr; gap: 4px; }
+
+  .topup-package-admin-row .package-active-field,
+  .topup-package-admin-row .package-remove-btn {
+    justify-self: start;
+  }
+}
+
 html,
 body {
   background: var(--bg);

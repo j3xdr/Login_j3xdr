@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./styles.css?v=20260817-featcat2" />
-  <link rel="stylesheet" href="./redesign.css?v=20260817-neutral-dark2" />
+  <link rel="stylesheet" href="./redesign.css?v=20260819-live-monitor" />
 </head>
 <body class="theme-dark">
   <!-- LOGIN -->
@@ -74,6 +74,12 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </span>
           <span class="nav-label">ผู้ใช้</span>
+        </button>
+        <button type="button" class="nav-item" data-view="monitor" title="Live Monitor">
+          <span class="nav-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2.2-6 4.1 12L16 10l1.6 2H21"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          </span>
+          <span class="nav-label">Live Monitor</span>
         </button>
         <button type="button" class="nav-item" data-view="cashier" title="งานด่วน">
           <span class="nav-icon" aria-hidden="true">
@@ -246,12 +252,13 @@
                   <th data-sort-key="name" tabindex="0" role="columnheader" aria-sort="none">ชื่อผู้ใช้</th>
                   <th data-sort-key="created" tabindex="0" role="columnheader" aria-sort="descending">สมัครเมื่อ</th>
                   <th data-sort-key="expires" tabindex="0" role="columnheader" aria-sort="none">หมดอายุ</th>
+                  <th>Token</th>
                   <th>สถานะ</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody id="users-body">
-                <tr><td class="muted" colspan="5">กำลังโหลด…</td></tr>
+                <tr><td class="muted" colspan="6">กำลังโหลด…</td></tr>
               </tbody>
             </table>
           </div>
@@ -260,6 +267,35 @@
             <button type="button" class="btn btn-ghost" id="users-more-btn">แสดงเพิ่ม</button>
           </div>
           <p id="list-status" class="status muted" role="status"></p>
+        </section>
+
+        <!-- LIVE MONITOR -->
+        <section id="view-monitor" class="pos-view" data-panel="monitor">
+          <div class="view-head">
+            <div>
+              <h2><span class="view-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.2-6 4.1 12L16 10l1.6 2H21"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg></span>Live Monitor</h2>
+              <p class="muted">สถานะ worker, งานที่กำลังทำ, คิว และประวัติการทำงานล่าสุด</p>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" id="refresh-monitor-btn">รีเฟรช</button>
+          </div>
+          <p id="monitor-status" class="status muted" role="status" aria-live="polite">เลือกแท็บเพื่อโหลดข้อมูล</p>
+          <div class="kpi-grid monitor-kpis">
+            <article class="kpi-card kpi-ok"><span class="kpi-label">Worker พร้อม</span><strong id="monitor-workers-alive" class="kpi-value">—</strong></article>
+            <article class="kpi-card"><span class="kpi-label">กำลังทำงาน</span><strong id="monitor-running" class="kpi-value">—</strong></article>
+            <article class="kpi-card kpi-warn"><span class="kpi-label">รอคิว</span><strong id="monitor-queued" class="kpi-value">—</strong></article>
+            <article class="kpi-card kpi-ok"><span class="kpi-label">สำเร็จทั้งหมด</span><strong id="monitor-succeeded" class="kpi-value">—</strong></article>
+            <article class="kpi-card kpi-warn"><span class="kpi-label">ไม่สำเร็จทั้งหมด</span><strong id="monitor-failed" class="kpi-value">—</strong></article>
+          </div>
+          <div class="users-toolbar panel monitor-toolbar">
+            <div class="search-field"><input id="monitor-search" type="search" placeholder="ค้นหาชื่อผู้ใช้ / ชนิดงาน / Worker…" autocomplete="off" spellcheck="false" /></div>
+            <select id="monitor-status-filter" class="select-input" aria-label="กรองสถานะงาน"><option value="all">ทุกสถานะ</option><option value="running">กำลังทำ</option><option value="queued">รอคิว</option><option value="succeeded">สำเร็จ</option><option value="failed">ไม่สำเร็จ</option><option value="cancelled">ยกเลิก</option></select>
+          </div>
+          <div class="monitor-grid">
+            <section class="panel"><div class="panel-head-row"><h3>Worker</h3><span class="muted" id="monitor-updated-at">—</span></div><div id="monitor-workers" class="monitor-list muted">กำลังโหลด…</div></section>
+            <section class="panel"><div class="panel-head-row"><h3>คิวฟาร์ม</h3><span class="muted" id="monitor-queue-count">—</span></div><div id="monitor-queue" class="monitor-list muted">กำลังโหลด…</div></section>
+          </div>
+          <section class="panel monitor-wide"><div class="panel-head-row"><div><h3>งานกำลังทำและประวัติล่าสุด</h3><p class="muted settings-hint">แสดงรายการล่าสุดตามตัวกรอง และสามารถคลิกชื่อผู้ใช้เพื่อเปิดบัญชีได้</p></div></div><div id="monitor-jobs" class="monitor-jobs muted">กำลังโหลด…</div></section>
+          <section class="panel monitor-wide"><div class="panel-head-row"><div><h3>ผู้ใช้ตามปริมาณงาน</h3><p class="muted settings-hint" id="monitor-user-scope">—</p></div></div><div id="monitor-users" class="monitor-users muted">กำลังโหลด…</div></section>
         </section>
 
         <!-- CASHIER -->
@@ -431,6 +467,9 @@
           <div class="system-grid">
             <div class="panel">
               <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v4M12 16h.01"/></svg></span>ปิดปรับปรุง</h3>
+              <section class="settings-group" aria-labelledby="settings-access-title">
+              <h4 id="settings-access-title">สถานะระบบและเมนูฟาร์ม</h4>
+              <p class="muted settings-hint">ควบคุมการเข้าถึงของลูกค้า และเรียงรายการฟังก์ชันที่หน้าเว็บ</p>
               <div class="settings-row">
                 <label class="toggle-field"><input type="checkbox" id="set-farm-maint" /><span>ปิดฟาร์มทั้งหมด</span></label>
                 <label class="toggle-field"><input type="checkbox" id="set-topup-maint" /><span>ปิดเติมเงิน</span></label>
@@ -438,6 +477,10 @@
               </div>
               <p class="muted settings-hint">ติ๊กปิดสมัคร = ปุ่มสมัครยังอยู่ แต่ฟอร์มถูกแทนด้วยปุ่ม Telegram · ลูกศรหรือลากเพื่อเรียงเมนูร้าน (DevPlay อยู่บนสุดเสมอ) · แก้ชื่อและรูปฟังก์ชันด้านล่างแล้วกดบันทึก</p>
               <div class="feature-order-list" id="feature-order-list" role="list" aria-label="เรียงลำดับฟีเจอร์ฟาร์ม"></div>
+              </section>
+              <section class="settings-group" aria-labelledby="settings-price-title">
+              <h4 id="settings-price-title">ราคา เครดิต และขีดจำกัดอัตโนมัติ</h4>
+              <p class="muted settings-hint">กำหนดราคา Credit, ขอบเขตการทำงาน และค่าเริ่มต้นของฟังก์ชันต่าง ๆ</p>
               <p class="muted settings-hint">ราคา Credit (กระเป๋าเดียวกับเชิญเพื่อน · แอดมินแก้ได้)</p>
               <div class="settings-row afterplay-price-row">
                 <label class="field">
@@ -518,11 +561,32 @@
                 </label>
               </div>
               <p class="muted settings-hint">เพดานรอบ: 0 = ไม่จำกัด จนกว่าจะถึงเป้าที่ลูกค้าใส่หรือระบบคำนวณ</p>
+              </section>
+              <section class="settings-group settings-save-group" aria-label="บันทึกการตั้งค่าระบบ">
               <div class="settings-row settings-actions">
                 <button type="button" class="btn btn-primary btn-sm" id="save-settings-btn">บันทึก</button>
                 <span id="settings-saved-at" class="settings-save-note muted">ค่าจะยึดตามการบันทึกล่าสุด</span>
               </div>
               <p id="settings-status" class="status muted" role="status"></p>
+              </section>
+            </div>
+            <div class="panel panel-wide" id="topup-packages-panel">
+              <div class="panel-head-row">
+                <div>
+                  <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h10M7 13h5"/><circle cx="17" cy="14" r="2"/></svg></span>แพ็กเติมวัน TrueMoney</h3>
+                  <p class="muted settings-hint">เปิด/ปิด เพิ่มแพ็ก แก้ราคา และแก้จำนวนวัน · ยอดซองอั่งเปาต้องตรงกับราคาที่ตั้งไว้</p>
+                </div>
+                <div class="settings-row settings-actions">
+                  <button type="button" class="btn btn-ghost btn-sm" id="refresh-topup-packages-btn">รีเฟรช</button>
+                  <button type="button" class="btn btn-primary btn-sm" id="add-topup-package-btn">เพิ่มแพ็ก</button>
+                </div>
+              </div>
+              <div id="topup-packages-admin-list" class="topup-packages-admin-list" role="status" aria-live="polite" aria-busy="true">กำลังโหลด…</div>
+              <p class="muted settings-hint">แพ็กที่ปิดจะหายจากหน้าเว็บและไม่ผ่านการตรวจยอด TrueMoney สำหรับรายการใหม่ แต่ประวัติเติมเงินเดิมยังอยู่</p>
+              <div class="settings-row settings-actions">
+                <button type="button" class="btn btn-primary btn-sm" id="save-topup-packages-btn">บันทึกแพ็กเติมวัน</button>
+              </div>
+              <p id="topup-packages-status" class="status muted" role="status"></p>
             </div>
             <div class="panel" id="afterplay-profile-panel">
               <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 14 9l6 3-6 3-2 6-2-6-6-3 6-3 2-6Z"/></svg></span>โปรไฟล์ ฟาร์มเงิน/XP</h3>
@@ -778,6 +842,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260817-featcat2"></script>
+  <script src="./app.js?v=20260819-live-monitor"></script>
 </body>
 </html>

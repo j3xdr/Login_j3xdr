@@ -262,10 +262,13 @@
   let inviteCreditUser = null;
   let currentView = "overview";
   let cachedUsers = [];
+  let monitorData = null;
+  let monitorTimer = null;
   let lastStats = null;
   let lastAudit = [];
   let stuckCount = 0;
   let settingsCache = {};
+  let adminTopupPackages = [];
   const SETTINGS_SNAPSHOT_KEY = "ckr_admin_last_saved_settings";
   const SETTINGS_NUMERIC_FIELDS = [
     "afterplay_fast_credit_per_run",
@@ -726,7 +729,7 @@
     }
 
     if (gPending) {
-      const map = { o: "overview", u: "users", c: "cashier", s: "system" };
+      const map = { o: "overview", u: "users", m: "monitor", c: "cashier", s: "system" };
       const view = map[e.key.toLowerCase()];
       if (view) {
         e.preventDefault();
@@ -1922,7 +1925,7 @@
         (u.ban_reason
           ? "<div><dt>เหตุผลแบน</dt><dd>" + escapeHtml(u.ban_reason) + "</dd></div>"
           : "") +
-        '</dl><div id="drawer-topups" class="muted">กำลังโหลดประวัติเติม…</div>';
+        '</dl><section id="drawer-jobs" class="drawer-history muted" aria-live="polite">กำลังโหลดประวัติงาน…</section><section id="drawer-topups" class="drawer-history muted">กำลังโหลดประวัติเติม…</section>';
     }
     if (actions) {
       const isSelf = adminId && u.id === adminId;
@@ -2000,6 +2003,7 @@
       }
     }
     if (drawer) openOverlay(drawer, { initialFocus: $("drawer-close") });
+    if (u.id) loadDrawerJobs(u.id);
     if (adminMode === "web" && u.id) loadDrawerTopups(u.id);
     else {
       const tp = $("drawer-topups");
@@ -2033,6 +2037,28 @@
           .join("");
     } catch (e) {
       root.textContent = e.message || String(e);
+    }
+  }
+
+  async function loadDrawerJobs(userId) {
+    const root = $("drawer-jobs");
+    if (!root) return;
+    if (PREVIEW_MODE) {
+      root.innerHTML = '<strong>ประวัติงาน <span class="muted">(2 งาน)</span></strong><div class="activity-row">heart · <span class="tag tag-active">กำลังทำ</span></div><div class="activity-row">partyrun · สำเร็จ</div>';
+      return;
+    }
+    try {
+      const data = await api("/api/admin/users/" + encodeURIComponent(userId) + "/jobs?limit=20");
+      const items = data.items || [];
+      if (!items.length) {
+        root.innerHTML = "<strong>ประวัติงาน</strong><div>ยังไม่มีงานในระบบ</div>";
+        return;
+      }
+      root.innerHTML =
+        "<strong>ประวัติงาน <span class=\"muted\">(" + escapeHtml(String(data.total ?? items.length)) + " งาน)</span></strong>" +
+        items.map((row) => '<div class="activity-row"><b>' + escapeHtml(row.kind || "งาน") + '</b> · <span class="monitor-status is-' + escapeHtml(row.status || "unknown") + '">' + escapeHtml(row.status || "—") + "</span><small>" + escapeHtml(formatMonitorTime(row.finished_at || row.started_at || row.created_at)) + "</small>" + (row.error ? '<small class="monitor-error">' + escapeHtml(row.error) + "</small>" : "") + "</div>").join("");
+    } catch (e) {
+      root.textContent = "โหลดประวัติงานไม่สำเร็จ: " + (e.message || String(e));
     }
   }
 
@@ -2276,6 +2302,98 @@
     document.querySelectorAll(".nav-item").forEach((btn) => {
       btn.classList.toggle("is-active", btn.getAttribute("data-view") === currentView);
     });
+    if (currentView === "monitor") startMonitorPolling();
+    else stopMonitorPolling();
+  }
+
+  function formatMonitorTime(value) {
+    if (!value) return "—";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return new Intl.DateTimeFormat("th-TH", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
+  }
+
+  function previewMonitorPayload() {
+    const now = new Date();
+    const iso = (mins) => new Date(now.getTime() - mins * 60000).toISOString();
+    return {
+      ok: true, generated_at: now.toISOString(), workers_alive: 3,
+      totals: { queued: 2, running: 1, succeeded: 119, failed: 9, cancelled: 2 },
+      workers: {
+        heart: { label: "หัวใจ", alive: true, id: "heart-01", slots: 1, kinds: ["heart"], age_sec: 4, detail: "พร้อมใช้งาน" },
+        powder: { label: "ผง", alive: true, id: "powder-01", slots: 1, kinds: ["powder"], age_sec: 8, detail: "พร้อมใช้งาน" },
+        light: { label: "งานเบา", alive: true, id: "light-01", slots: 2, kinds: ["partyrun", "friend"], age_sec: 2, detail: "พร้อมใช้งาน" },
+      },
+      queue: [{ id: "q-1", user_id: "preview-03", username: "gamma.expiring", status: "waiting", job_kind: "heart", joined_at: iso(3) }],
+      active_jobs: [{ job_id: "j-1", user_id: "preview-01", username: "alpha.demo", kind: "heart", status: "running", progress: { percent: 62 }, created_at: iso(8), started_at: iso(7), claimed_by: "heart-01" }],
+      recent_jobs: [
+        { job_id: "j-1", user_id: "preview-01", username: "alpha.demo", kind: "heart", status: "running", progress: { percent: 62 }, created_at: iso(8), started_at: iso(7) },
+        { job_id: "j-2", user_id: "preview-02", username: "beta.permanent", kind: "partyrun", status: "succeeded", created_at: iso(20), finished_at: iso(11) },
+        { job_id: "j-3", user_id: "preview-03", username: "gamma.expiring", kind: "powder", status: "failed", error: "หมดเวลาเชื่อมต่อ", created_at: iso(34), finished_at: iso(30) },
+      ],
+      users: [{ user_id: "preview-01", username: "alpha.demo", jobs: 4, queued: 1, running: 1, succeeded: 2, failed: 0, cancelled: 0, kinds: { heart: 3, partyrun: 1 } }, { user_id: "preview-02", username: "beta.permanent", jobs: 3, queued: 0, running: 0, succeeded: 3, failed: 0, cancelled: 0, kinds: { partyrun: 3 } }],
+      activity_window: 3,
+    };
+  }
+
+  function monitorSearchMatches(row, query) {
+    if (!query) return true;
+    return [row.username, row.user_id, row.kind, row.status, row.claimed_by, row.job_kind, row.id].some((value) => String(value || "").toLowerCase().includes(query));
+  }
+
+  function renderMonitor() {
+    const data = monitorData;
+    if (!data) return;
+    const totals = data.totals || {};
+    animateKpi($("monitor-workers-alive"), data.workers_alive ?? 0);
+    animateKpi($("monitor-running"), totals.running ?? 0);
+    animateKpi($("monitor-queued"), totals.queued ?? 0);
+    animateKpi($("monitor-succeeded"), totals.succeeded ?? 0);
+    animateKpi($("monitor-failed"), totals.failed ?? 0);
+    if ($("monitor-updated-at")) $("monitor-updated-at").textContent = "อัปเดต " + formatMonitorTime(data.generated_at);
+    const workers = Object.values(data.workers || {}).filter((worker) => worker && worker.role !== "heavy");
+    const workersRoot = $("monitor-workers");
+    if (workersRoot) workersRoot.innerHTML = workers.length ? workers.map((worker) => `<div class="monitor-row"><span class="monitor-dot ${worker.alive ? "is-live" : ""}"></span><div><b>${escapeHtml(worker.label || worker.role || "Worker")}</b><small>${escapeHtml(worker.id || "ยังไม่มีสัญญาณ")} · ${escapeHtml((worker.kinds || []).join(", ") || "—")}</small></div><span class="monitor-status ${worker.alive ? "is-running" : "is-failed"}">${escapeHtml(worker.detail || (worker.alive ? "พร้อม" : "ออฟไลน์"))}</span></div>`).join("") : "ไม่มีข้อมูล worker";
+    const query = ($("monitor-search")?.value || "").trim().toLowerCase();
+    const status = $("monitor-status-filter")?.value || "all";
+    const queue = (data.queue || []).filter((row) => monitorSearchMatches(row, query));
+    if ($("monitor-queue-count")) $("monitor-queue-count").textContent = queue.length + " รายการ";
+    const queueRoot = $("monitor-queue");
+    if (queueRoot) queueRoot.innerHTML = queue.length ? queue.map((row) => `<div class="monitor-row"><div><button type="button" class="monitor-user-link" data-monitor-user="${escapeHtml(row.user_id || "")}">${escapeHtml(row.username || "—")}</button><small>${escapeHtml(row.job_kind || "งาน")} · เข้า ${escapeHtml(formatMonitorTime(row.joined_at))}</small></div><span class="monitor-status is-queued">${escapeHtml(row.status || "waiting")}</span></div>`).join("") : "ไม่มีคิวที่รออยู่";
+    const jobIndex = new Map();
+    [...(data.active_jobs || []), ...(data.recent_jobs || [])].forEach((row) => {
+      jobIndex.set(row.job_id || (row.user_id + ":" + row.created_at), row);
+    });
+    const jobs = [...jobIndex.values()].filter((row) => monitorSearchMatches(row, query) && (status === "all" || row.status === status));
+    const jobsRoot = $("monitor-jobs");
+    if (jobsRoot) jobsRoot.innerHTML = jobs.length ? jobs.map((row) => `<article class="monitor-job"><div><button type="button" class="monitor-user-link" data-monitor-user="${escapeHtml(row.user_id || "")}">${escapeHtml(row.username || "—")}</button><b>${escapeHtml(row.kind || "งาน")}</b><small>${escapeHtml(formatMonitorTime(row.finished_at || row.started_at || row.created_at))}${row.claimed_by ? " · " + escapeHtml(row.claimed_by) : ""}</small></div><div><span class="monitor-status is-${escapeHtml(row.status || "unknown")}">${escapeHtml(row.status || "—")}</span>${row.error ? `<small class="monitor-error">${escapeHtml(row.error)}</small>` : ""}</div></article>`).join("") : "ไม่พบงานตามตัวกรอง";
+    const userRoot = $("monitor-users");
+    const users = (data.users || []).filter((row) => monitorSearchMatches(row, query));
+    if ($("monitor-user-scope")) $("monitor-user-scope").textContent = "สรุปจากงานล่าสุด " + (data.activity_window ?? 0) + " รายการ";
+    if (userRoot) userRoot.innerHTML = users.length ? users.map((row) => `<article class="monitor-user-summary"><button type="button" class="monitor-user-link" data-monitor-user="${escapeHtml(row.user_id || "")}">${escapeHtml(row.username || "—")}</button><strong>${escapeHtml(String(row.jobs || 0))} งาน</strong><small>สำเร็จ ${escapeHtml(String(row.succeeded || 0))} · ล้มเหลว ${escapeHtml(String(row.failed || 0))} · ${escapeHtml(Object.entries(row.kinds || {}).map(([kind, count]) => kind + " " + count).join(", "))}</small></article>`).join("") : "ไม่พบผู้ใช้ตามคำค้น";
+  }
+
+  async function loadMonitor() {
+    const status = $("monitor-status");
+    if (status) setStatus(status, "กำลังอัปเดตสถานะ worker และคิว…", "muted");
+    try {
+      monitorData = PREVIEW_MODE ? previewMonitorPayload() : await api("/api/admin/monitor?limit=100");
+      renderMonitor();
+      if (status) setStatus(status, "อัปเดตแล้ว · รีเฟรชอัตโนมัติทุก 10 วินาทีขณะเปิดแท็บนี้", "ok");
+    } catch (e) {
+      if (status) setStatus(status, e.message || String(e), "err");
+    }
+  }
+
+  function startMonitorPolling() {
+    loadMonitor();
+    if (monitorTimer) return;
+    monitorTimer = setInterval(() => { if (currentView === "monitor" && !document.hidden) loadMonitor(); }, 10000);
+  }
+
+  function stopMonitorPolling() {
+    if (monitorTimer) clearInterval(monitorTimer);
+    monitorTimer = null;
   }
 
   function paintKpis() {
@@ -2826,6 +2944,108 @@
       eb.hidden = mode !== "episode_box";
       eb.classList.toggle("hidden", mode !== "episode_box");
     }
+  }
+
+  function defaultAdminTopupPackages() {
+    return [
+      { id: "full_1d", kind: "full", label_th: "1 วัน", price_baht: 200, days: 1, hours: 24, active: true },
+      { id: "full_3d", kind: "full", label_th: "3 วัน", price_baht: 500, days: 3, hours: 72, active: true, promo: true },
+      { id: "full_7d", kind: "full", label_th: "7 วัน", price_baht: 990, days: 7, hours: 168, active: true, promo: true },
+      { id: "feat_12h", kind: "feature", label_th: "12 ชม. · 1 ฟังก์ชัน", price_baht: 50, hours: 12, active: true },
+    ];
+  }
+
+  function renderAdminTopupPackages() {
+    const root = $("topup-packages-admin-list");
+    if (!root) return;
+    root.setAttribute("aria-busy", "false");
+    if (!adminTopupPackages.length) {
+      root.innerHTML = '<p class="muted">ยังไม่มีแพ็กเติมวัน · กด “เพิ่มแพ็ก” เพื่อสร้างรายการ</p>';
+      return;
+    }
+    root.innerHTML = adminTopupPackages
+      .map((pkg, index) => {
+        const kind = pkg.kind === "feature" ? "feature" : "full";
+        const id = escapeHtml(String(pkg.id || "full_custom_" + (index + 1)));
+        const label = escapeHtml(String(pkg.label_th || ""));
+        const price = Number(pkg.price_baht) || 0;
+        const days = Number(pkg.days ?? pkg.package_days) || 1;
+        const hours = Number(pkg.hours) || 12;
+        return (
+          '<div class="topup-package-admin-row is-' + kind + '" data-package-index="' + index + '">' +
+          '<label class="field"><span>ชื่อแพ็ก</span><input data-package-field="label_th" value="' + label + '" maxlength="80" /></label>' +
+          '<label class="field"><span>ประเภท</span><select data-package-field="kind"><option value="full"' + (kind === "full" ? " selected" : "") + '>เติมวัน</option><option value="feature"' + (kind === "feature" ? " selected" : "") + '>เลือกฟังก์ชัน</option></select></label>' +
+          '<label class="field"><span>ราคา (บาท)</span><input data-package-field="price_baht" type="number" min="1" max="1000000" step="1" value="' + price + '" /></label>' +
+          '<label class="field package-kind-full"><span>จำนวนวัน</span><input data-package-field="days" type="number" min="1" max="3650" step="1" value="' + days + '" /></label>' +
+          '<label class="field package-kind-feature"><span>จำนวนชั่วโมง</span><input data-package-field="hours" type="number" min="1" max="87600" step="1" value="' + hours + '" /></label>' +
+          '<label class="toggle-field package-active-field"><input data-package-field="active" type="checkbox"' + (pkg.active !== false ? " checked" : "") + ' /><span>เปิดขาย</span></label>' +
+          '<span class="muted package-id-note" title="รหัสใช้กับประวัติและรายการเติมเงิน">ID: ' + id + '</span>' +
+          '</div>'
+        );
+      })
+      .join("");
+  }
+
+  function syncAdminTopupRow(row) {
+    if (!row) return;
+    const kind = row.querySelector('[data-package-field="kind"]')?.value === "feature" ? "feature" : "full";
+    row.classList.toggle("is-full", kind === "full");
+    row.classList.toggle("is-feature", kind === "feature");
+  }
+
+  function readAdminTopupPackages() {
+    const root = $("topup-packages-admin-list");
+    if (!root) return [];
+    return Array.from(root.querySelectorAll("[data-package-index]")).map((row) => {
+      const value = (field) => row.querySelector('[data-package-field="' + field + '"]')?.value;
+      const kind = value("kind") === "feature" ? "feature" : "full";
+      const out = {
+        id: adminTopupPackages[Number(row.dataset.packageIndex)]?.id || "",
+        kind,
+        label_th: String(value("label_th") || "").trim(),
+        price_baht: Math.max(1, Math.floor(Number(value("price_baht")) || 0)),
+        active: !!row.querySelector('[data-package-field="active"]')?.checked,
+      };
+      if (kind === "feature") {
+        out.hours = Math.max(1, Math.floor(Number(value("hours")) || 12));
+      } else {
+        out.days = Math.max(1, Math.floor(Number(value("days")) || 1));
+      }
+      return out;
+    });
+  }
+
+  async function loadAdminTopupPackages() {
+    const root = $("topup-packages-admin-list");
+    if (!root) return;
+    if (PREVIEW_MODE) {
+      adminTopupPackages = defaultAdminTopupPackages();
+      renderAdminTopupPackages();
+      return;
+    }
+    root.setAttribute("aria-busy", "true");
+    root.textContent = "กำลังโหลด…";
+    try {
+      const data = await api("/api/admin/topup/packages");
+      adminTopupPackages = Array.isArray(data.packages) ? data.packages : [];
+      renderAdminTopupPackages();
+    } catch (err) {
+      root.setAttribute("aria-busy", "false");
+      root.textContent = err.message || String(err);
+      setStatus($("topup-packages-status"), err.message || String(err), "err");
+    }
+  }
+
+  async function saveAdminTopupPackages() {
+    const payload = readAdminTopupPackages();
+    if (!payload.length) throw new Error("ต้องมีแพ็กอย่างน้อย 1 รายการ หรือใช้ปิดเติมเงินทั้งหมด");
+    const response = await api("/api/admin/topup/packages", {
+      method: "POST",
+      body: { packages: payload },
+    });
+    adminTopupPackages = Array.isArray(response?.packages) ? response.packages : payload;
+    renderAdminTopupPackages();
+    await loadAudit();
   }
 
   async function loadSettings() {
@@ -3397,7 +3617,9 @@
               escapeHtml(formatDay(u.created_at)) +
               '</td><td data-label="หมดอายุ" class="muted">' +
               escapeHtml(formatExpiryCell(u)) +
-              '</td><td data-label="สถานะ"><span class="tag tag-' +
+              '</td><td data-label="Token"><strong>' +
+              escapeHtml(String(u.token_balance ?? 0)) +
+              '</strong></td><td data-label="สถานะ"><span class="tag tag-' +
               st.kind +
               '">' +
               escapeHtml(st.label) +
@@ -3428,6 +3650,8 @@
               escapeHtml(formatDay(u.created_at)) +
               "</span><span>หมดอายุ: " +
               escapeHtml(formatExpiryCell(u)) +
+              "</span><span>Token: " +
+              escapeHtml(String(u.token_balance ?? 0)) +
               "</span></div></article>"
             );
           })
@@ -3497,10 +3721,12 @@
       loadAudit(),
       loadStats(),
       loadSettings(),
+      loadAdminTopupPackages(),
     ]);
   }
 
   function showLogin() {
+    stopMonitorPolling();
     dash.classList.add("hidden");
     loginPanel.classList.remove("hidden");
     adminId = null;
@@ -3646,6 +3872,7 @@
       { id: "cmd-create", label: "สร้างบัญชี", meta: "แคชเชียร์", run: () => openRentalTask("create") },
       { id: "cmd-extend", label: "ต่ออายุ", meta: "แคชเชียร์", run: () => openRentalTask("extend") },
       { id: "cmd-users", label: "ไปหน้าผู้ใช้", meta: "นำทาง", run: () => showView("users") },
+      { id: "cmd-monitor", label: "ไปหน้า Live Monitor", meta: "นำทาง", run: () => showView("monitor") },
       { id: "cmd-overview", label: "ไปหน้าภาพรวม", meta: "นำทาง", run: () => showView("overview") },
       { id: "cmd-system", label: "ไปหน้าระบบ", meta: "นำทาง", run: () => showView("system") },
       {
@@ -3673,7 +3900,7 @@
           $("invite-credit-q")?.focus();
         },
       },
-      { id: "cmd-refresh", label: "รีเฟรชข้อมูล", meta: "ระบบ", run: () => Promise.all([loadUsers(), loadStats(), loadAudit(), loadStuckTopups(), loadSettings()]) },
+      { id: "cmd-refresh", label: "รีเฟรชข้อมูล", meta: "ระบบ", run: () => Promise.all([loadUsers(), loadStats(), loadAudit(), loadStuckTopups(), loadSettings(), loadAdminTopupPackages()]) },
       {
         id: "cmd-early-access",
         label: "เข้าถึงก่อนใคร",
@@ -4175,7 +4402,19 @@
   });
 
   $("refresh-overview-btn")?.addEventListener("click", async () => {
-    await Promise.all([loadUsers(), loadStats(), loadAudit(), loadStuckTopups(), loadSettings()]);
+    await Promise.all([loadUsers(), loadStats(), loadAudit(), loadStuckTopups(), loadSettings(), loadAdminTopupPackages()]);
+  });
+
+  $("refresh-monitor-btn")?.addEventListener("click", () => loadMonitor());
+  $("monitor-search")?.addEventListener("input", () => renderMonitor());
+  $("monitor-status-filter")?.addEventListener("change", () => renderMonitor());
+  $("view-monitor")?.addEventListener("click", (e) => {
+    const button = e.target.closest("[data-monitor-user]");
+    if (!button) return;
+    const userId = button.getAttribute("data-monitor-user");
+    if (!userId) return;
+    showView("users");
+    openUserDrawer(userId);
   });
 
   $("login-form")?.addEventListener("submit", async (e) => {
@@ -4312,6 +4551,42 @@
       setStatus($("settings-status"), err.message || String(err), "err");
     } finally {
       setBtnLoading($("save-settings-btn"), false);
+    }
+  });
+
+  $("refresh-topup-packages-btn")?.addEventListener("click", () => loadAdminTopupPackages());
+  $("add-topup-package-btn")?.addEventListener("click", () => {
+    const next = adminTopupPackages.length + 1;
+    adminTopupPackages.push({
+      id: "full_custom_" + Date.now(),
+      kind: "full",
+      label_th: next + " วัน",
+      price_baht: 200,
+      days: next,
+      hours: next * 24,
+      active: true,
+    });
+    renderAdminTopupPackages();
+    const root = $("topup-packages-admin-list");
+    root?.lastElementChild?.querySelector('[data-package-field="label_th"]')?.focus();
+  });
+  $("topup-packages-admin-list")?.addEventListener("change", (event) => {
+    const row = event.target?.closest?.("[data-package-index]");
+    if (row && event.target?.getAttribute("data-package-field") === "kind") {
+      syncAdminTopupRow(row);
+    }
+  });
+  $("save-topup-packages-btn")?.addEventListener("click", async () => {
+    const btn = $("save-topup-packages-btn");
+    setBtnLoading(btn, true);
+    setStatus($("topup-packages-status"), "กำลังบันทึกแพ็ก…", "muted");
+    try {
+      await saveAdminTopupPackages();
+      setStatus($("topup-packages-status"), "บันทึกแพ็กแล้ว · ราคาใหม่มีผลกับ TrueMoney และหน้าเว็บ", "ok");
+    } catch (err) {
+      setStatus($("topup-packages-status"), err.message || String(err), "err");
+    } finally {
+      setBtnLoading(btn, false);
     }
   });
 
