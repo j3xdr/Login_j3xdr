@@ -45,7 +45,7 @@
 
 .topup-package-admin-row {
   display: grid;
-  grid-template-columns: minmax(150px, 1.5fr) 120px 110px 110px 110px auto;
+  grid-template-columns: minmax(150px, 1.5fr) 130px 110px 130px 120px auto;
   gap: 10px;
   align-items: end;
   padding: 12px;
@@ -69,7 +69,9 @@
 }
 
 .topup-package-admin-row .package-kind-feature,
-.topup-package-admin-row .package-kind-full {
+.topup-package-admin-row .package-kind-full,
+.topup-package-admin-row .package-duration-days,
+.topup-package-admin-row .package-duration-hours {
   display: none;
 }
 
@@ -78,6 +80,11 @@
 }
 
 .topup-package-admin-row.is-full .package-kind-full {
+  display: block;
+}
+
+.topup-package-admin-row.is-full.is-duration-days .package-duration-days,
+.topup-package-admin-row.is-full.is-duration-hours .package-duration-hours {
   display: block;
 }
 

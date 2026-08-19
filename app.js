@@ -3008,10 +3008,10 @@
 
   function defaultAdminTopupPackages() {
     return [
-      { id: "full_1d", kind: "full", label_th: "1 วัน", price_baht: 200, days: 1, hours: 24, active: true },
-      { id: "full_3d", kind: "full", label_th: "3 วัน", price_baht: 500, days: 3, hours: 72, active: true, promo: true },
-      { id: "full_7d", kind: "full", label_th: "7 วัน", price_baht: 990, days: 7, hours: 168, active: true, promo: true },
-      { id: "feat_12h", kind: "feature", label_th: "12 ชม. · 1 ฟังก์ชัน", price_baht: 50, hours: 12, active: true },
+      { id: "full_1d", kind: "full", duration_unit: "days", duration_value: 1, label_th: "1 วัน", price_baht: 200, days: 1, hours: 24, active: true },
+      { id: "full_3d", kind: "full", duration_unit: "days", duration_value: 3, label_th: "3 วัน", price_baht: 500, days: 3, hours: 72, active: true, promo: true },
+      { id: "full_7d", kind: "full", duration_unit: "days", duration_value: 7, label_th: "7 วัน", price_baht: 990, days: 7, hours: 168, active: true, promo: true },
+      { id: "feat_12h", kind: "feature", duration_unit: "hours", duration_value: 12, label_th: "12 ชม. · 1 ฟังก์ชัน", price_baht: 50, hours: 12, active: true },
     ];
   }
 
@@ -3031,13 +3031,15 @@
         const price = Number(pkg.price_baht) || 0;
         const days = Number(pkg.days ?? pkg.package_days) || 1;
         const hours = Number(pkg.hours) || 12;
+        const durationUnit = kind === "full" && pkg.duration_unit === "hours" ? "hours" : "days";
         return (
-          '<div class="topup-package-admin-row is-' + kind + '" data-package-index="' + index + '">' +
+          '<div class="topup-package-admin-row is-' + kind + ' is-duration-' + durationUnit + '" data-package-index="' + index + '">' +
           '<label class="field"><span>ชื่อแพ็ก</span><input data-package-field="label_th" value="' + label + '" maxlength="80" /></label>' +
-          '<label class="field"><span>ประเภท</span><select data-package-field="kind"><option value="full"' + (kind === "full" ? " selected" : "") + '>เติมวัน</option><option value="feature"' + (kind === "feature" ? " selected" : "") + '>เลือกฟังก์ชัน</option></select></label>' +
+          '<label class="field"><span>ประเภทสิทธิ์</span><select data-package-field="kind"><option value="full"' + (kind === "full" ? " selected" : "") + '>ทุกฟังก์ชัน</option><option value="feature"' + (kind === "feature" ? " selected" : "") + '>เลือก 1 ฟังก์ชัน</option></select></label>' +
           '<label class="field"><span>ราคา (บาท)</span><input data-package-field="price_baht" type="number" min="1" max="1000000" step="1" value="' + price + '" /></label>' +
-          '<label class="field package-kind-full"><span>จำนวนวัน</span><input data-package-field="days" type="number" min="1" max="3650" step="1" value="' + days + '" /></label>' +
-          '<label class="field package-kind-feature"><span>จำนวนชั่วโมง</span><input data-package-field="hours" type="number" min="1" max="87600" step="1" value="' + hours + '" /></label>' +
+          '<label class="field package-kind-full"><span>หน่วยระยะเวลา</span><select data-package-field="duration_unit"><option value="days"' + (durationUnit === "days" ? " selected" : "") + '>วัน</option><option value="hours"' + (durationUnit === "hours" ? " selected" : "") + '>ชั่วโมง</option></select></label>' +
+          '<label class="field package-duration-days"><span>จำนวนวัน</span><input data-package-field="days" type="number" min="1" max="3650" step="1" value="' + days + '" /></label>' +
+          '<label class="field package-kind-feature package-duration-hours"><span>จำนวนชั่วโมง</span><input data-package-field="hours" type="number" min="1" max="87600" step="1" value="' + hours + '" /></label>' +
           '<label class="toggle-field package-active-field"><input data-package-field="active" type="checkbox"' + (pkg.active !== false ? " checked" : "") + ' /><span>เปิดขาย</span></label>' +
           '<span class="muted package-id-note" title="รหัสใช้กับประวัติและรายการเติมเงิน">ID: ' + id + '</span>' +
           '</div>'
@@ -3049,8 +3051,11 @@
   function syncAdminTopupRow(row) {
     if (!row) return;
     const kind = row.querySelector('[data-package-field="kind"]')?.value === "feature" ? "feature" : "full";
+    const durationUnit = row.querySelector('[data-package-field="duration_unit"]')?.value === "hours" ? "hours" : "days";
     row.classList.toggle("is-full", kind === "full");
     row.classList.toggle("is-feature", kind === "feature");
+    row.classList.toggle("is-duration-days", kind === "full" && durationUnit === "days");
+    row.classList.toggle("is-duration-hours", kind === "full" && durationUnit === "hours");
   }
 
   function readAdminTopupPackages() {
@@ -3069,7 +3074,12 @@
       if (kind === "feature") {
         out.hours = Math.max(1, Math.floor(Number(value("hours")) || 12));
       } else {
-        out.days = Math.max(1, Math.floor(Number(value("days")) || 1));
+        out.duration_unit = value("duration_unit") === "hours" ? "hours" : "days";
+        if (out.duration_unit === "hours") {
+          out.hours = Math.max(1, Math.floor(Number(value("hours")) || 1));
+        } else {
+          out.days = Math.max(1, Math.floor(Number(value("days")) || 1));
+        }
       }
       return out;
     });
@@ -4631,6 +4641,8 @@
     adminTopupPackages.push({
       id: "full_custom_" + Date.now(),
       kind: "full",
+      duration_unit: "days",
+      duration_value: next,
       label_th: next + " วัน",
       price_baht: 200,
       days: next,
@@ -4643,7 +4655,7 @@
   });
   $("topup-packages-admin-list")?.addEventListener("change", (event) => {
     const row = event.target?.closest?.("[data-package-index]");
-    if (row && event.target?.getAttribute("data-package-field") === "kind") {
+    if (row && ["kind", "duration_unit"].includes(event.target?.getAttribute("data-package-field"))) {
       syncAdminTopupRow(row);
     }
   });
