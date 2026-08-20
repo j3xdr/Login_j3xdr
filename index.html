@@ -114,10 +114,6 @@
             <svg class="topbar-task-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
             <span>ต่ออายุ</span>
           </button>
-          <button type="button" class="topbar-task-btn" data-shortcut="credit-user">
-            <svg class="topbar-task-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 14 9l6 3-6 3-2 6-2-6-6-3 6-3 2-6Z"/></svg>
-            <span>เติมเครดิต</span>
-          </button>
           <button type="button" class="topbar-task-btn" data-shortcut="create-user">
             <svg class="topbar-task-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M18 8v6M15 11h6"/></svg>
             <span>สร้างบัญชี</span>
@@ -131,7 +127,6 @@
           <button type="button" class="mode-btn is-active" data-mode="day" id="mode-day">PC</button>
           <button type="button" class="mode-btn" data-mode="powder" id="mode-powder">Powder</button>
           <button type="button" class="mode-btn" data-mode="web" id="mode-web">Web</button>
-          <button type="button" class="mode-btn" data-mode="invite" id="mode-invite">Invite</button>
         </div>
         <div class="topbar-right">
           <button type="button" id="cmd-open-btn" class="btn btn-ghost btn-sm cmd-hint-btn" title="ค้นหาด่วน (⌘K)">
@@ -177,10 +172,6 @@
             <button type="button" class="shortcut-btn" data-shortcut="extend-user">
               <span class="shortcut-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
               <span><strong>เติมวัน / ต่ออายุ</strong><small>เลือกแพ็กหรือกำหนดวันเอง</small></span>
-            </button>
-            <button type="button" class="shortcut-btn" data-shortcut="credit-user">
-              <span class="shortcut-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 14 9l6 3-6 3-2 6-2-6-6-3 6-3 2-6Z"/></svg></span>
-              <span><strong>เติมเครดิต</strong><small>เพิ่ม/ลด Invite Credit พร้อมเหตุผล</small></span>
             </button>
             <button type="button" class="shortcut-btn mode-web-only" data-shortcut="stuck-topups">
               <span class="shortcut-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 17H3L12 3Z"/><path d="M12 9v4M12 16h.01"/></svg></span>
@@ -252,13 +243,12 @@
                   <th data-sort-key="name" tabindex="0" role="columnheader" aria-sort="none">ชื่อผู้ใช้</th>
                   <th data-sort-key="created" tabindex="0" role="columnheader" aria-sort="descending">สมัครเมื่อ</th>
                   <th data-sort-key="expires" tabindex="0" role="columnheader" aria-sort="none">หมดอายุ</th>
-                  <th>Token</th>
                   <th>สถานะ</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody id="users-body">
-                <tr><td class="muted" colspan="6">กำลังโหลด…</td></tr>
+                <tr><td class="muted" colspan="5">กำลังโหลด…</td></tr>
               </tbody>
             </table>
           </div>
@@ -415,38 +405,6 @@
               </div>
               </div>
 
-              <div id="cashier-invite-panel" class="cashier-tab panel mode-invite-only" role="tabpanel">
-                <form id="invite-credit-lookup-form" class="inline-row">
-                  <label class="field grow">
-                    <span>ชื่อผู้ใช้</span>
-                    <input id="invite-credit-q" type="text" required spellcheck="false" autocomplete="off" enterkeyhint="search" />
-                  </label>
-                  <button class="btn btn-ghost" type="submit">ค้นหา</button>
-                </form>
-                <div id="invite-credit-result" class="lookup-box muted">—</div>
-                <form id="invite-credit-form" class="invite-credit-form">
-                  <label class="field">
-                    <span>จำนวน Credit (บวก = เพิ่ม, ลบ = ลด)</span>
-                    <input id="invite-credit-delta" type="number" inputmode="decimal" step="0.5" value="14" required />
-                  </label>
-                  <div class="pack-row pack-row-wide">
-                    <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="0.5">+0.5</button>
-                    <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="14">+14</button>
-                    <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="28">+28</button>
-                    <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="140">+140</button>
-                    <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="-14">−14</button>
-                    <button type="button" class="btn btn-ghost btn-sm" data-invite-delta="-28">−28</button>
-                  </div>
-                  <label class="field">
-                    <span>เหตุผล</span>
-                    <input id="invite-credit-reason" type="text" maxlength="80" placeholder="เช่น ชดเชย / ปรับยอด" autocomplete="off" />
-                  </label>
-                  <div class="inline-row-actions">
-                    <button class="btn btn-primary" type="submit" id="invite-credit-grant-btn">บันทึก Credit</button>
-                  </div>
-                  <p id="invite-credit-status" class="status muted" role="status"></p>
-                </form>
-              </div>
             </div>
 
             <aside class="panel receipt-panel" aria-live="polite">
@@ -479,21 +437,12 @@
               <div class="feature-order-list" id="feature-order-list" role="list" aria-label="เรียงลำดับฟีเจอร์ฟาร์ม"></div>
               </section>
               <section class="settings-group" aria-labelledby="settings-price-title">
-              <h4 id="settings-price-title">ราคา เครดิต และขีดจำกัดอัตโนมัติ</h4>
-              <p class="muted settings-hint">กำหนดราคา Credit, ขอบเขตการทำงาน และค่าเริ่มต้นของฟังก์ชันต่าง ๆ</p>
-              <p class="muted settings-hint">ราคา Credit (กระเป๋าเดียวกับเชิญเพื่อน · แอดมินแก้ได้)</p>
+              <h4 id="settings-price-title">ขีดจำกัดและค่าเริ่มต้นของฟาร์ม</h4>
+              <p class="muted settings-hint">กำหนดขอบเขตการทำงานและค่าเริ่มต้นของฟังก์ชันต่าง ๆ โดยทุกงานใช้สิทธิ์เวลา</p>
               <div class="settings-row afterplay-price-row">
-                <label class="field">
-                  <span>ฟาร์มเงิน/XP / รอบ</span>
-                  <input id="set-afterplay-fast-price" type="number" inputmode="decimal" step="0.5" min="0" max="1000" />
-                </label>
                 <label class="field">
                   <span>เพดานรอบฟาร์มเงิน/XP</span>
                   <input id="set-afterplay-fast-max-runs" type="number" inputmode="numeric" step="1" min="0" max="100000" placeholder="0 = ไม่จำกัด" />
-                </label>
-                <label class="field">
-                  <span>Episode Box / รอบ</span>
-                  <input id="set-episode-box-price" type="number" inputmode="decimal" step="0.5" min="0" max="1000" />
                 </label>
                 <label class="field">
                   <span>เพดานรอบ/ด่าน Episode Box</span>
@@ -502,26 +451,6 @@
                 <label class="toggle-field">
                   <input type="checkbox" id="set-episode-box-enabled" checked />
                   <span>เปิดโหมด Episode Box ในแท็บฟาร์มเงิน/XP</span>
-                </label>
-                <label class="field">
-                  <span>ปลดล็อค L / ตัว</span>
-                  <input id="set-unlock-l-each" type="number" inputmode="decimal" step="0.5" min="0" max="10000" />
-                </label>
-                <label class="field">
-                  <span>ปลดล็อค L ครบ 7</span>
-                  <input id="set-unlock-l-bundle" type="number" inputmode="decimal" step="0.5" min="0" max="10000" />
-                </label>
-                <label class="field">
-                  <span>Unlock L · สมบัติ Special (ใบละ)</span>
-                  <input id="set-unlock-l-treasure" type="number" inputmode="decimal" step="0.5" min="0" max="10000" />
-                </label>
-                <label class="field">
-                  <span>Ice Tower / ชั้น</span>
-                  <input id="set-ice-tower-each" type="number" inputmode="decimal" step="0.5" min="0" max="10000" />
-                </label>
-                <label class="field">
-                  <span>Ice Tower เหมา Select All</span>
-                  <input id="set-ice-tower-bundle" type="number" inputmode="decimal" step="1" min="0" max="10000" />
                 </label>
                 <label class="field">
                   <span>Ice Tower ดาวเป้าหมายเริ่มต้น</span>

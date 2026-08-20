@@ -1156,10 +1156,6 @@
 
   function describeRentalUser(u) {
     const st = rentalStatus(u);
-    const credit =
-      u && u.invite_credit_balance != null
-        ? " · Invite: " + Number(u.invite_credit_balance || 0) + " Credit"
-        : "";
     return (
       "<strong>" +
       escapeHtml(u.username || "—") +
@@ -1169,24 +1165,11 @@
         ? ' <span class="muted">(' + escapeHtml(st.detail) + ")</span>"
         : "") +
       otherProductHints(u) +
-      escapeHtml(credit) +
       " · บทบาท: " +
       escapeHtml(u.role || "normal")
     );
   }
 
-  function describeInviteCreditUser(u) {
-    const bal = Number(u?.invite_credit_balance || 0) || 0;
-    return (
-      "<strong>" +
-      escapeHtml(u?.username || "—") +
-      "</strong> · Invite Credit: <strong>" +
-      bal +
-      "</strong>" +
-      " · บทบาท: " +
-      escapeHtml(u?.role || "normal")
-    );
-  }
 
   function paintReceipt(lines) {
     const box = $("receipt-box");
@@ -1916,14 +1899,6 @@
         "<div><dt>บทบาท</dt><dd>" +
         escapeHtml(u.role || "normal") +
         "</dd></div>" +
-        (u.invite_credit_balance != null
-          ? "<div><dt>Invite Credit</dt><dd><strong>" +
-            escapeHtml(String(u.invite_credit_balance)) +
-            "</strong></dd></div>"
-          : "") +
-        (u.token_balance != null
-          ? "<div><dt>Token</dt><dd>" + escapeHtml(String(u.token_balance)) + "</dd></div>"
-          : "") +
         (u.ban_reason
           ? "<div><dt>เหตุผลแบน</dt><dd>" + escapeHtml(u.ban_reason) + "</dd></div>"
           : "") +
@@ -1941,15 +1916,6 @@
             openRentalTask("extend");
             if ($("extend-q")) $("extend-q").value = u.username || "";
             $("extend-lookup-form")?.requestSubmit();
-          })
-        );
-        actions.appendChild(
-          makeBtn("เติมเครดิต", "btn btn-ghost btn-sm", () => {
-            closeUserDrawer();
-            setMode("invite");
-            showView("cashier");
-            if ($("invite-credit-q")) $("invite-credit-q").value = u.username || "";
-            $("invite-credit-lookup-form")?.requestSubmit();
           })
         );
         if (isPermanent(u)) {
@@ -2250,7 +2216,6 @@
   function setMode(mode) {
     if (mode === "web" || mode === "token") adminMode = "web";
     else if (mode === "powder") adminMode = "powder";
-    else if (mode === "invite") adminMode = "invite";
     else adminMode = "day";
     try {
       localStorage.setItem(MODE_KEY, adminMode);
@@ -2258,33 +2223,22 @@
     dash?.classList.toggle("mode-day", adminMode === "day");
     dash?.classList.toggle("mode-powder", adminMode === "powder");
     dash?.classList.toggle("mode-web", adminMode === "web");
-    dash?.classList.toggle("mode-invite", adminMode === "invite");
     $("mode-day")?.classList.toggle("is-active", adminMode === "day");
     $("mode-powder")?.classList.toggle("is-active", adminMode === "powder");
     $("mode-web")?.classList.toggle("is-active", adminMode === "web");
-    $("mode-invite")?.classList.toggle("is-active", adminMode === "invite");
-    const modeLabels = { day: "PC", powder: "Powder", web: "Web", invite: "Invite" };
+    const modeLabels = { day: "PC", powder: "Powder", web: "Web" };
     const fieldHints = {
       day: "expires_at (PC)",
       powder: "powder_expires_at (Powder)",
       web: "rental_expires_at (Web)",
-      invite: "invite_credit_balance",
     };
     if ($("overview-mode-hint")) {
       $("overview-mode-hint").textContent =
-        adminMode === "invite"
-          ? "โหมด Invite · เพิ่ม/ลด Invite Credit · Guest Pool"
-          : "โหมด " +
-            modeLabels[adminMode] +
-            " · ฟิลด์ " +
-            fieldHints[adminMode] +
-            " · ถาวรแยกกัน";
+        "โหมด " + modeLabels[adminMode] + " · ฟิลด์ " + fieldHints[adminMode] + " · ถาวรแยกกัน";
     }
     if ($("cashier-mode-hint")) {
       $("cashier-mode-hint").textContent =
-        adminMode === "invite"
-          ? "เพิ่ม / ลด Invite Credit"
-          : "เปิดสิทธิ์วันใช้งาน (" + modeLabels[adminMode] + ")";
+        "เปิดสิทธิ์วันใช้งาน (" + modeLabels[adminMode] + ")";
     }
     if ($("sidebar-mode-label")) {
       $("sidebar-mode-label").textContent = modeLabels[adminMode];
@@ -2526,7 +2480,7 @@
             " วัน · " +
             escapeHtml(baht) +
             "฿</strong>" +
-            '<button type="button" class="btn btn-primary btn-sm" data-action="credit-retry">เครดิตซ้ำ</button></div>' +
+            '<button type="button" class="btn btn-primary btn-sm" data-action="credit-retry">ประมวลผลซ้ำ</button></div>' +
             '<div class="muted">ผู้ใช้: ' +
             escapeHtml(row.user_id) +
             " · " +
@@ -3687,9 +3641,7 @@
               escapeHtml(formatDay(u.created_at)) +
               '</td><td data-label="หมดอายุ" class="muted">' +
               escapeHtml(formatExpiryCell(u)) +
-              '</td><td data-label="Token"><strong>' +
-              escapeHtml(String(u.token_balance ?? 0)) +
-              '</strong></td><td data-label="สถานะ"><span class="tag tag-' +
+              '</td><td data-label="สถานะ"><span class="tag tag-' +
               st.kind +
               '">' +
               escapeHtml(st.label) +
@@ -3720,8 +3672,6 @@
               escapeHtml(formatDay(u.created_at)) +
               "</span><span>หมดอายุ: " +
               escapeHtml(formatExpiryCell(u)) +
-              "</span><span>Token: " +
-              escapeHtml(String(u.token_balance ?? 0)) +
               "</span></div></article>"
             );
           })
@@ -3960,16 +3910,6 @@
                   : "day"
           ),
       },
-      {
-        id: "cmd-invite-credit",
-        label: "ปรับ Invite Credit",
-        meta: "แคชเชียร์",
-        run: () => {
-          setMode("invite");
-          showView("cashier");
-          $("invite-credit-q")?.focus();
-        },
-      },
       { id: "cmd-refresh", label: "รีเฟรชข้อมูล", meta: "ระบบ", run: () => Promise.all([loadUsers(), loadStats(), loadAudit(), loadStuckTopups(), loadSettings(), loadAdminTopupPackages()]) },
       {
         id: "cmd-early-access",
@@ -4118,7 +4058,6 @@
   $("mode-day")?.addEventListener("click", () => setMode("day"));
   $("mode-powder")?.addEventListener("click", () => setMode("powder"));
   $("mode-web")?.addEventListener("click", () => setMode("web"));
-  $("mode-invite")?.addEventListener("click", () => setMode("invite"));
 
   $("invite-credit-lookup-form")?.addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -4460,11 +4399,6 @@
         openRentalTask("extend");
         $("extend-q")?.focus();
       }
-      if (s === "credit-user") {
-        setMode("invite");
-        showView("cashier");
-        $("invite-credit-q")?.focus();
-      }
       if (s === "stuck-topups") {
         showView("system");
       }
@@ -4737,9 +4671,9 @@
     const id = row?.getAttribute("data-redemption-id");
     if (!id) return;
     const confirmed = await showConfirmModal({
-      title: "เครดิตซ้ำ?",
+      title: "ประมวลผลซ้ำ?",
       body: "ยืนยันเติมวันเช่าให้รายการค้างนี้",
-      confirmLabel: "เครดิตซ้ำ",
+      confirmLabel: "ประมวลผลซ้ำ",
       cancelLabel: "ยกเลิก",
       icon: "assets/coin.png",
     });
@@ -4753,7 +4687,7 @@
       await Promise.all([loadStuckTopups(), loadUsers(), loadAudit()]);
     } catch (err) {
       await showAlertModal({
-        title: "เครดิตไม่สำเร็จ",
+        title: "ประมวลผลไม่สำเร็จ",
         body: err.message || String(err),
         mode: "error",
       });
