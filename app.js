@@ -17,6 +17,7 @@
   const THEME_KEY = "ckr_admin_theme";
   const EDGE_ADMIN_FN = "admin-register";
   const USERS_PAGE = 100;
+  const INVITE_CREDITS_PER_LINK = 14;
   const PREVIEW_MODE = (() => {
     try {
       const host = location.hostname;
@@ -1170,6 +1171,19 @@
     );
   }
 
+  function describeInviteCreditUser(u) {
+    const bal = Number(u?.invite_credit_balance || 0) || 0;
+    const links = Math.max(0, Math.floor(bal / INVITE_CREDITS_PER_LINK));
+    return (
+      "<strong>" +
+      escapeHtml(u?.username || "—") +
+      "</strong> · Credit Link: <strong>" +
+      links +
+      "</strong>" +
+      " · บทบาท: " +
+      escapeHtml(u?.role || "normal")
+    );
+  }
 
   function paintReceipt(lines) {
     const box = $("receipt-box");
@@ -1899,6 +1913,12 @@
         "<div><dt>บทบาท</dt><dd>" +
         escapeHtml(u.role || "normal") +
         "</dd></div>" +
+        (u.token_balance != null
+          ? "<div><dt>Token</dt><dd>" + escapeHtml(String(u.token_balance)) + "</dd></div>"
+          : "") +
+        "<div><dt>Credit Link</dt><dd>" +
+        escapeHtml(String(Math.max(0, Math.floor((Number(u.invite_credit_balance) || 0) / INVITE_CREDITS_PER_LINK)))) +
+        "</dd></div>" +
         (u.ban_reason
           ? "<div><dt>เหตุผลแบน</dt><dd>" + escapeHtml(u.ban_reason) + "</dd></div>"
           : "") +
@@ -1917,6 +1937,11 @@
             if ($("extend-q")) $("extend-q").value = u.username || "";
             $("extend-lookup-form")?.requestSubmit();
           })
+        );
+        actions.appendChild(
+          makeBtn("แก้ Credit Link", "btn btn-ghost btn-sm", () =>
+            runDrawerAction(() => adjustInviteLinksForUser(u))
+          )
         );
         if (isPermanent(u)) {
           actions.appendChild(
@@ -2042,6 +2067,54 @@
     } catch (e) {
       await showAlertModal({ title: "ไม่สำเร็จ", body: e.message, mode: "error" });
     }
+  }
+
+  async function adjustInviteLinksForUser(user) {
+    const current = Math.max(
+      0,
+      Math.floor((Number(user?.invite_credit_balance) || 0) / INVITE_CREDITS_PER_LINK)
+    );
+    const raw = await showPromptModal({
+      title: "แก้ Credit Link",
+      body: 'เพิ่ม/ลด Credit Link ให้ "' + (user?.username || "") + '" (ปัจจุบัน ' + current + " Link)",
+      placeholder: "เช่น 1 หรือ -1",
+      defaultValue: "1",
+      confirmLabel: "ต่อไป",
+      cancelLabel: "ยกเลิก",
+    });
+    if (raw === null) return false;
+    const linkDelta = Number(raw);
+    if (!Number.isInteger(linkDelta) || !linkDelta) {
+      throw new Error("ระบุจำนวน Credit Link เป็นจำนวนเต็มที่ไม่เป็น 0");
+    }
+    const approved = await showConfirmModal({
+      title: linkDelta > 0 ? "เพิ่ม Credit Link?" : "ลด Credit Link?",
+      body:
+        (linkDelta > 0 ? "เพิ่ม +" : "ลด ") +
+        Math.abs(linkDelta) +
+        " Credit Link ให้ " +
+        (user?.username || "") +
+        " ?",
+      confirmLabel: "ยืนยัน",
+      cancelLabel: "ยกเลิก",
+      danger: linkDelta < 0,
+    });
+    if (!approved) return false;
+    const data = await api("/api/admin/invite-credit/grant", {
+      method: "POST",
+      body: {
+        user_id: user.id,
+        username: user.username,
+        link_delta: linkDelta,
+        reason: "admin_user_drawer",
+      },
+    });
+    paintReceipt([
+      linkDelta > 0 ? "เพิ่ม Credit Link" : "ลด Credit Link",
+      "User: " + (data.username || user.username),
+      "Delta: " + (linkDelta > 0 ? "+" : "") + linkDelta + " Link",
+      "คงเหลือ: " + data.credit_links + " Credit Link",
+    ]);
   }
 
   async function runDrawerBan(ban) {
@@ -2216,6 +2289,7 @@
   function setMode(mode) {
     if (mode === "web" || mode === "token") adminMode = "web";
     else if (mode === "powder") adminMode = "powder";
+    else if (mode === "invite") adminMode = "invite";
     else adminMode = "day";
     try {
       localStorage.setItem(MODE_KEY, adminMode);
@@ -2223,22 +2297,33 @@
     dash?.classList.toggle("mode-day", adminMode === "day");
     dash?.classList.toggle("mode-powder", adminMode === "powder");
     dash?.classList.toggle("mode-web", adminMode === "web");
+    dash?.classList.toggle("mode-invite", adminMode === "invite");
     $("mode-day")?.classList.toggle("is-active", adminMode === "day");
     $("mode-powder")?.classList.toggle("is-active", adminMode === "powder");
     $("mode-web")?.classList.toggle("is-active", adminMode === "web");
-    const modeLabels = { day: "PC", powder: "Powder", web: "Web" };
+    $("mode-invite")?.classList.toggle("is-active", adminMode === "invite");
+    const modeLabels = { day: "PC", powder: "Powder", web: "Web", invite: "Invite" };
     const fieldHints = {
       day: "expires_at (PC)",
       powder: "powder_expires_at (Powder)",
       web: "rental_expires_at (Web)",
+      invite: "Guest Pool และสิทธิ์วันใช้งาน",
     };
     if ($("overview-mode-hint")) {
       $("overview-mode-hint").textContent =
-        "โหมด " + modeLabels[adminMode] + " · ฟิลด์ " + fieldHints[adminMode] + " · ถาวรแยกกัน";
+        adminMode === "invite"
+          ? "โหมด Invite · จัดการ Guest Pool"
+          : "โหมด " +
+            modeLabels[adminMode] +
+            " · ฟิลด์ " +
+            fieldHints[adminMode] +
+            " · ถาวรแยกกัน";
     }
     if ($("cashier-mode-hint")) {
       $("cashier-mode-hint").textContent =
-        "เปิดสิทธิ์วันใช้งาน (" + modeLabels[adminMode] + ")";
+        adminMode === "invite"
+          ? "จัดการสิทธิ์วันใช้งาน"
+          : "เปิดสิทธิ์วันใช้งาน (" + modeLabels[adminMode] + ")";
     }
     if ($("sidebar-mode-label")) {
       $("sidebar-mode-label").textContent = modeLabels[adminMode];
@@ -2480,7 +2565,7 @@
             " วัน · " +
             escapeHtml(baht) +
             "฿</strong>" +
-            '<button type="button" class="btn btn-primary btn-sm" data-action="credit-retry">ประมวลผลซ้ำ</button></div>' +
+            '<button type="button" class="btn btn-primary btn-sm" data-action="credit-retry">ดำเนินการต่อ</button></div>' +
             '<div class="muted">ผู้ใช้: ' +
             escapeHtml(row.user_id) +
             " · " +
@@ -3218,11 +3303,78 @@
           (data.guests_per_link || 29) +
           " guest/link)";
       }
+      paintInviteProvision(data.maintenance);
       return data;
     } catch (err) {
       if (el) el.textContent = "โหลดสถิติไม่สำเร็จ";
       setStatus($("invite-pool-status"), err.message || String(err), "err");
       return null;
+    }
+  }
+
+  function inviteProvisionEta(seconds) {
+    const value = Math.max(0, Math.ceil(Number(seconds) || 0));
+    if (!value) return "กำลังประเมินเวลา";
+    const mins = Math.floor(value / 60);
+    const secs = value % 60;
+    return mins > 0 ? "เหลือประมาณ " + mins + " นาที " + secs + " วินาที" : "เหลือประมาณ " + secs + " วินาที";
+  }
+
+  function paintInviteProvision(state) {
+    const el = $("invite-provision-progress");
+    if (!el) return;
+    if (!state?.maintenance) {
+      el.textContent = "Pool พร้อมใช้งาน · ระบบจะเติมอัตโนมัติเมื่อเหลือต่ำกว่า 3 Link";
+      return;
+    }
+    const current = Math.max(0, Number(state.created_guests) || 0);
+    const total = Math.max(0, Number(state.target_guests) || 0);
+    const phase = state.phase === "waiting_worker" ? "รอ Light worker ว่าง" : "กำลังสร้าง Guest";
+    el.textContent =
+      phase +
+      " · " + current + "/" + total +
+      " Guest · " + inviteProvisionEta(state.eta_seconds) +
+      (state.message ? " · " + state.message : "");
+  }
+
+  async function requestInviteProvision() {
+    const status = $("invite-provision-status");
+    const links = Math.min(50, Math.max(1, Number($("invite-provision-links")?.value) || 1));
+    const replacePool = !!$("invite-provision-replace")?.checked;
+    const total = links * 29;
+    const approved = await showConfirmModal({
+      title: "สร้าง Guest " + links + " Link?",
+      body:
+        "ระบบจะเข้า maintenance ทันที และสร้าง Guest " + total +
+        " รายการด้วย Proxy ร้านเดียวกับ Web\n" +
+        "งานรับได้เฉพาะ Light worker slot ที่ว่าง จึงไม่ตัดงานฟาร์มที่กำลังรัน" +
+        (replacePool ? "\n\nGuest เก่าใน Pool จะถูกล้างก่อนเริ่ม" : ""),
+      confirmLabel: "Accept และเริ่มสร้าง",
+      danger: replacePool,
+    });
+    if (!approved) return;
+    const btn = $("invite-provision-btn");
+    setBtnLoading(btn, true);
+    setStatus(status, "ตั้งค่างานสร้าง Guest…", "muted");
+    try {
+      const data = await api("/api/admin/invite-pool/provision", {
+        method: "POST",
+        body: { links, replace_pool: replacePool },
+      });
+      paintInviteProvision(data.maintenance);
+      setStatus(
+        status,
+        "รับงานแล้ว · Maintenance เปิดทันที · เป้าหมาย " + total + " Guest",
+        "ok"
+      );
+      toast("เริ่มสร้าง Guest " + links + " Link แล้ว", "ok");
+      await loadInvitePoolStats();
+    } catch (err) {
+      const maintenance = err.data?.detail?.maintenance;
+      if (maintenance) paintInviteProvision(maintenance);
+      setStatus(status, err.message || String(err), "err");
+    } finally {
+      setBtnLoading(btn, false);
     }
   }
 
@@ -4075,10 +4227,11 @@
     }
   });
 
-  document.querySelectorAll("[data-invite-delta]").forEach((btn) => {
+  document.querySelectorAll("[data-invite-link-delta]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      if ($("invite-credit-delta")) {
-        $("invite-credit-delta").value = btn.getAttribute("data-invite-delta") || "14";
+      if ($("invite-credit-link-delta")) {
+        $("invite-credit-link-delta").value =
+          btn.getAttribute("data-invite-link-delta") || "1";
       }
     });
   });
@@ -4088,27 +4241,27 @@
     const username = String(
       inviteCreditUser?.username || $("invite-credit-q")?.value || ""
     ).trim();
-    const delta = Number($("invite-credit-delta")?.value || 0);
-    const reason = String($("invite-credit-reason")?.value || "").trim() || "admin_grant";
+    const linkDelta = Number($("invite-credit-link-delta")?.value || 0);
+    const reason = String($("invite-credit-reason")?.value || "").trim() || "admin_link_grant";
     if (!username) {
       setStatus($("invite-credit-status"), "ค้นหาชื่อผู้ใช้ก่อน", "err");
       return;
     }
-    if (!delta) {
-      setStatus($("invite-credit-status"), "ใส่จำนวน Credit ที่ไม่เป็น 0", "err");
+    if (!Number.isInteger(linkDelta) || !linkDelta) {
+      setStatus($("invite-credit-status"), "ใส่จำนวน Credit Link เป็นจำนวนเต็มที่ไม่เป็น 0", "err");
       return;
     }
     const confirmed = await showConfirmModal({
-      title: delta > 0 ? "เพิ่ม Invite Credit?" : "ลด Invite Credit?",
+      title: linkDelta > 0 ? "เพิ่ม Credit Link?" : "ลด Credit Link?",
       body:
-        (delta > 0 ? "เพิ่ม +" : "ลด ") +
-        delta +
-        " Credit ให้ " +
+        (linkDelta > 0 ? "เพิ่ม +" : "ลด ") +
+        Math.abs(linkDelta) +
+        " Credit Link ให้ " +
         username +
         " ?",
       confirmLabel: "ยืนยัน",
       cancelLabel: "ยกเลิก",
-      danger: delta < 0,
+      danger: linkDelta < 0,
     });
     if (!confirmed) return;
     setBtnLoading($("invite-credit-grant-btn"), true);
@@ -4118,7 +4271,7 @@
         body: {
           username,
           user_id: inviteCreditUser?.id || undefined,
-          delta,
+          link_delta: linkDelta,
           reason,
         },
       });
@@ -4134,18 +4287,18 @@
       }
       setStatus(
         $("invite-credit-status"),
-        (delta > 0 ? "เพิ่ม +" : "ลด ") +
-          delta +
+        (linkDelta > 0 ? "เพิ่ม +" : "ลด ") +
+          Math.abs(linkDelta) +
           " สำเร็จ · คงเหลือ " +
-          data.invite_credit_balance +
-          " Credit",
+          data.credit_links +
+          " Credit Link",
         "ok"
       );
       paintReceipt([
-        delta > 0 ? "เพิ่ม Invite Credit" : "ลด Invite Credit",
+        linkDelta > 0 ? "เพิ่ม Credit Link" : "ลด Credit Link",
         "User: " + (data.username || username),
-        "Delta: " + (delta > 0 ? "+" : "") + delta,
-        "คงเหลือ: " + data.invite_credit_balance + " Credit",
+        "Delta: " + (linkDelta > 0 ? "+" : "") + linkDelta + " Link",
+        "คงเหลือ: " + data.credit_links + " Credit Link",
         "เหตุผล: " + reason,
       ]);
       await loadAudit();
@@ -4497,6 +4650,7 @@
   $("refresh-stuck-btn")?.addEventListener("click", () => loadStuckTopups());
   $("refresh-audit-btn")?.addEventListener("click", () => loadAudit());
   $("invite-pool-refresh-btn")?.addEventListener("click", () => loadInvitePoolStats());
+  $("invite-provision-btn")?.addEventListener("click", () => requestInviteProvision());
   $("invite-pool-merge-btn")?.addEventListener("click", () => mergeInvitePool());
   $("invite-pool-clear-ready-btn")?.addEventListener("click", () =>
     clearInvitePool("ready", false)
@@ -4671,9 +4825,9 @@
     const id = row?.getAttribute("data-redemption-id");
     if (!id) return;
     const confirmed = await showConfirmModal({
-      title: "ประมวลผลซ้ำ?",
+      title: "ดำเนินการเติมวันต่อ?",
       body: "ยืนยันเติมวันเช่าให้รายการค้างนี้",
-      confirmLabel: "ประมวลผลซ้ำ",
+      confirmLabel: "ดำเนินการต่อ",
       cancelLabel: "ยกเลิก",
       icon: "assets/coin.png",
     });
@@ -4687,7 +4841,7 @@
       await Promise.all([loadStuckTopups(), loadUsers(), loadAudit()]);
     } catch (err) {
       await showAlertModal({
-        title: "ประมวลผลไม่สำเร็จ",
+        title: "ดำเนินการไม่สำเร็จ",
         body: err.message || String(err),
         mode: "error",
       });

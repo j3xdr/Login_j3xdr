@@ -1515,3 +1515,31 @@ input:focus, .select-input:focus, .prompt-input:focus {
 
   .cmd-root { padding-top: 8vh; }
 }
+.invite-provision-admin {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid var(--border, rgba(255,255,255,.12));
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.invite-provision-admin h4 {
+  margin: 0 0 4px;
+}
+
+.invite-provision-admin .checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: end;
+  min-height: 40px;
+}
+
+.invite-credit-admin .lookup-box {
+  margin: 10px 0 0;
+}
+
+.invite-credit-admin .field small {
+  margin-top: 4px;
+  font-size: 0.78rem;
+}

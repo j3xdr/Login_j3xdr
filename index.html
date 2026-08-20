@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="./styles.css?v=20260817-featcat2" />
+  <link rel="stylesheet" href="./styles.css?v=20260820-inviteprovision" />
   <link rel="stylesheet" href="./redesign.css?v=20260819-duration-units" />
 </head>
 <body class="theme-dark">
@@ -437,8 +437,8 @@
               <div class="feature-order-list" id="feature-order-list" role="list" aria-label="เรียงลำดับฟีเจอร์ฟาร์ม"></div>
               </section>
               <section class="settings-group" aria-labelledby="settings-price-title">
-              <h4 id="settings-price-title">ขีดจำกัดและค่าเริ่มต้นของฟาร์ม</h4>
-              <p class="muted settings-hint">กำหนดขอบเขตการทำงานและค่าเริ่มต้นของฟังก์ชันต่าง ๆ โดยทุกงานใช้สิทธิ์เวลา</p>
+              <h4 id="settings-price-title">ขีดจำกัดและค่าเริ่มต้นของฟีเจอร์</h4>
+              <p class="muted settings-hint">ฟีเจอร์ทั้งหมดใช้สิทธิ์วันใช้งาน ไม่มีการคิดค่าใช้จ่ายต่อรอบ</p>
               <div class="settings-row afterplay-price-row">
                 <label class="field">
                   <span>เพดานรอบฟาร์มเงิน/XP</span>
@@ -594,7 +594,7 @@
             </div>
             <div class="panel">
               <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></span>เข้าถึงก่อนใคร</h3>
-              <p class="muted settings-hint">เลือกฟีเจอร์ที่ปิดอยู่ แล้วใส่ username ที่ให้เห็นและใช้ได้ · สิทธิ์ถาวรจนกว่าจะลบชื่อ · ไม่แทนวันเช่าและไม่ให้ Credit ฟรี</p>
+              <p class="muted settings-hint">เลือกฟีเจอร์ที่ปิดอยู่ แล้วใส่ username ที่ให้เห็นและใช้ได้ · สิทธิ์ถาวรจนกว่าจะลบชื่อ และไม่แทนวันเช่า</p>
               <label class="field">
                 <span>ฟีเจอร์</span>
                 <select id="early-access-feature" aria-label="เลือกฟีเจอร์เข้าถึงก่อนใคร"></select>
@@ -684,6 +684,29 @@
               </div>
               <p class="muted settings-hint">Invite Guest Pool แยกจากคลังส่งหัวใจ · อัปโหลด/วาง JSON จาก guest_pool.json — merge รวมเข้า Pool (dedupe ตาม mid)</p>
               <p id="invite-pool-stats" class="muted settings-hint" style="margin:0 0 8px;">Ready: — · Links: —</p>
+              <div class="invite-provision-admin" aria-labelledby="invite-provision-title">
+                <div class="panel-head-row">
+                  <div>
+                    <h4 id="invite-provision-title">สร้าง Guest อัตโนมัติ</h4>
+                    <p class="muted settings-hint">ใช้ Proxy ร้านเดียวกับ Web · งานจะรับเฉพาะ Light worker slot ที่ว่าง โดยไม่ตัดงานฟาร์มที่กำลังรัน</p>
+                  </div>
+                </div>
+                <div class="settings-row">
+                  <label class="field" for="invite-provision-links">
+                    <span>จำนวน Link ที่ต้องการเพิ่ม</span>
+                    <input id="invite-provision-links" type="number" min="1" max="50" step="1" value="1" inputmode="numeric" />
+                  </label>
+                  <label class="checkbox-row" for="invite-provision-replace">
+                    <input id="invite-provision-replace" type="checkbox" />
+                    <span>ล้าง Guest เดิมก่อนสร้าง</span>
+                  </label>
+                </div>
+                <div class="settings-row settings-actions">
+                  <button type="button" class="btn btn-primary btn-sm" id="invite-provision-btn">Accept และสร้าง Guest</button>
+                </div>
+                <p id="invite-provision-progress" class="muted settings-hint" aria-live="polite">ยังไม่มีงานสร้าง Guest</p>
+                <p id="invite-provision-status" class="status muted" role="status"></p>
+              </div>
               <label class="field" for="invite-pool-file">
                 <span>ไฟล์ .json</span>
                 <input id="invite-pool-file" type="file" accept=".json,application/json" />
@@ -699,6 +722,44 @@
               </div>
               <p id="invite-pool-status" class="status muted" role="status"></p>
             </div>
+            <section class="panel mode-invite-only invite-credit-admin" aria-labelledby="invite-credit-admin-title">
+              <div class="panel-head-row">
+                <div>
+                  <h3 id="invite-credit-admin-title">Credit Link ของผู้ใช้</h3>
+                  <p class="muted settings-hint">เพิ่มหรือลดเป็นหน่วย Link โดยตรง · 1 Credit Link ใช้เชิญเพื่อนได้ 29 คน</p>
+                </div>
+              </div>
+              <form id="invite-credit-lookup-form" class="invite-credit-form">
+                <label class="field" for="invite-credit-q">
+                  <span>ค้นหาผู้ใช้</span>
+                  <input id="invite-credit-q" type="search" autocomplete="off" placeholder="username" required />
+                </label>
+                <div class="settings-row settings-actions">
+                  <button type="submit" class="btn btn-ghost btn-sm">ค้นหา</button>
+                </div>
+              </form>
+              <div id="invite-credit-result" class="lookup-box muted" aria-live="polite">ค้นหาผู้ใช้เพื่อดู Credit Link</div>
+              <form id="invite-credit-form" class="invite-credit-form">
+                <div class="settings-row">
+                  <label class="field" for="invite-credit-link-delta">
+                    <span>จำนวน Credit Link ที่เพิ่ม/ลด</span>
+                    <input id="invite-credit-link-delta" type="number" min="-100000" max="100000" step="1" inputmode="numeric" value="1" required aria-describedby="invite-credit-link-help" />
+                    <small id="invite-credit-link-help" class="muted">ใส่จำนวนติดลบเพื่อลด Link</small>
+                  </label>
+                  <label class="field grow" for="invite-credit-reason">
+                    <span>เหตุผล</span>
+                    <input id="invite-credit-reason" type="text" maxlength="80" value="admin_link_grant" autocomplete="off" />
+                  </label>
+                </div>
+                <div class="settings-row settings-actions">
+                  <button type="button" class="btn btn-ghost btn-sm" data-invite-link-delta="1">+1 Link</button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-invite-link-delta="5">+5 Link</button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-invite-link-delta="10">+10 Link</button>
+                  <button type="submit" class="btn btn-primary btn-sm" id="invite-credit-grant-btn">บันทึก Credit Link</button>
+                </div>
+              </form>
+              <p id="invite-credit-status" class="status muted" role="status" aria-live="polite"></p>
+            </section>
             <div class="panel mode-web-only">
               <div class="panel-head-row">
               <h3><span class="panel-title-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>เติมค้าง / ตามมือ</h3>
@@ -771,6 +832,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./config.js?v=20260730-ui3"></script>
-  <script src="./app.js?v=20260820-day-only"></script>
+  <script src="./app.js?v=20260820-invitelinks"></script>
 </body>
 </html>
